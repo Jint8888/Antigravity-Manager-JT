@@ -473,29 +473,27 @@ pub async fn handle_messages(
 }
 
 /// 列出可用模型
-pub async fn handle_list_models() -> impl IntoResponse {
+pub async fn handle_list_models(State(state): State<AppState>) -> impl IntoResponse {
+    use crate::proxy::common::model_mapping::get_all_dynamic_models;
+
+    let model_ids = get_all_dynamic_models(
+        &state.openai_mapping,
+        &state.custom_mapping,
+        &state.anthropic_mapping,
+    ).await;
+
+    let data: Vec<_> = model_ids.into_iter().map(|id| {
+        json!({
+            "id": id,
+            "object": "model",
+            "created": 1706745600,
+            "owned_by": "antigravity"
+        })
+    }).collect();
+
     Json(json!({
         "object": "list",
-        "data": [
-            {
-                "id": "claude-sonnet-4-5",
-                "object": "model",
-                "created": 1706745600,
-                "owned_by": "anthropic"
-            },
-            {
-                "id": "claude-opus-4-5-thinking",
-                "object": "model",
-                "created": 1706745600,
-                "owned_by": "anthropic"
-            },
-            {
-                "id": "claude-3-5-sonnet-20241022",
-                "object": "model",
-                "created": 1706745600,
-                "owned_by": "anthropic"
-            }
-        ]
+        "data": data
     }))
 }
 

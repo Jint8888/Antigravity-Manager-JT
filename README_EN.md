@@ -59,6 +59,8 @@ By leveraging this app, you can transform common Web Sessions (Google/Anthropic)
 ### 4. 🔀 Model Router Center
 *   **Series-based Mapping**: Classify complex original model IDs into "Series Groups" (e.g., routing all GPT-4 requests uniformly to `gemini-3-pro-high`).
 *   **Expert Redirection**: Supports custom regex-level model mapping for precise control over every request's landing model.
+*   **Tiered Routing [New]**: Automatically prioritizes models based on account tiers (Ultra/Pro/Free) and reset frequencies to ensure stability for high-volume users.
+*   **Silent Background Downgrading [New]**: Intelligently identifies background tasks (e.g., Claude CLI title generation) and reroutes them to Flash models to preserve premium quota.
 
 ### 5. 🎨 Multimodal & Imagen 3 Support
 *   **Advanced Image Control**: Supports precise control over image generation tasks via OpenAI `size` (e.g., `1024x1024`, `16:9`) parameters or model name suffixes.
@@ -179,11 +181,15 @@ print(response.choices[0].message.content)
             - **Persistent State Management**: Disabling state is saved to disk and persists across restarts. Optimized loading logic to skip disabled accounts.
             - **Smart Auto-recovery**: Accounts are automatically re-enabled when the user manually updates the refresh or access tokens in the UI.
             - **Documentation**: Added detailed documentation for the invalid grant handling mechanism.
-        - **Quota Management & Intelligent Routing (Fine-grained Optimization)**:
-            - **Background Task Smart Downgrading**: Automatically detects Claude CLI/Agent background tasks (title generation, summary, suggestions, etc.) and routes them to low-cost Flash models, significantly preserving premium quota.
-            - **Tiered Account Routing (ULTRA > PRO > FREE)**: Implemented priority-based routing. The system now prioritizes fast-resetting ULTRA accounts, reserving FREE accounts as a final fallback.
-            - **Atomic Concurrency Locking**: Enhanced session locking in `TokenManager`. Ensures consistent account selection for concurrent requests in Agent mode, preventing excessive rotation.
-            - **Expanded Keyword Library**: Integrated 30+ intent-based keywords across 5 categories for background tasks, improving detection accuracy to over 95%.
+        - **Dynamic Model List API (Intelligent Endpoint Optimization)**:
+            - **Real-time Dynamic Sync**: `/v1/models` (OpenAI) and `/v1/models/claude` (Claude) endpoints now aggregate built-in and custom mappings in real-time. Changes in settings take effect instantly.
+            - **Full Model Support**: Prefix filtering is removed. Users can now directly see and use image models like `gemini-3-pro-image-4k-16x9` and all custom IDs in terminals or clients.
+        - **Quota Management & Intelligent Routing (Operational Optimization & Bug Fixes)**:
+            - **Background Task Smart Downgrading**: Automatically identifies and reroutes Claude CLI/Agent background tasks (titles, summaries, etc.) to Flash models, fixing the issue where these requests previously consumed premium/long-context quotas.
+            - **Concurrency Lock & Quota Protection**: Fixed the issue where multiple concurrent requests caused account quota overflow. Atomic locks ensure account consistency within the same session, preventing unnecessary rotations.
+            - **Tiered Account Sorting (ULTRA > PRO > FREE)**: The system now automatically sorts model routes based on quota reset frequency (hourly vs. daily). Highlights premium accounts that reset frequently, reserving FREE accounts as a final safety net.
+            - **Atomic Concurrency Locking**: Enhanced `TokenManager` session locking. In high-concurrency scenarios (e.g., Agent mode), ensures stable account assignment for requests within the same session.
+            - **Expanded Keyword Library**: Integrated 30+ intent-based keywords for background tasks, improving detection accuracy to over 95%.
 
     *   **v3.3.7 (2025-12-30)**:
         - **Proxy Core Stability Fixes (Core Thanks to @llsenyue PR #191)**:

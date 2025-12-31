@@ -89,11 +89,11 @@ fn parse_image_config(model_name: &str) -> (Value, String) {
     let mut aspect_ratio = "1:1";
     let _image_size = "1024x1024"; // Default, not explicitly sent unless 4k/hd
 
-    if model_name.contains("-16x9") { aspect_ratio = "16:9"; }
-    else if model_name.contains("-9x16") { aspect_ratio = "9:16"; }
-    else if model_name.contains("-4x3") { aspect_ratio = "4:3"; }
-    else if model_name.contains("-3x4") { aspect_ratio = "3:4"; }
-    else if model_name.contains("-1x1") { aspect_ratio = "1:1"; }
+    if model_name.contains("-16x9") || model_name.contains("-16-9") { aspect_ratio = "16:9"; }
+    else if model_name.contains("-9x16") || model_name.contains("-9-16") { aspect_ratio = "9:16"; }
+    else if model_name.contains("-4x3") || model_name.contains("-4-3") { aspect_ratio = "4:3"; }
+    else if model_name.contains("-3x4") || model_name.contains("-3-4") { aspect_ratio = "3:4"; }
+    else if model_name.contains("-1x1") || model_name.contains("-1-1") { aspect_ratio = "1:1"; }
 
     let is_hd = model_name.contains("-4k") || model_name.contains("-hd");
 

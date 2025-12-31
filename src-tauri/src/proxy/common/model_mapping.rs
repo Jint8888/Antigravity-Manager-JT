@@ -68,6 +68,72 @@ pub fn map_claude_model_to_gemini(input: &str) -> String {
     "claude-sonnet-4-5".to_string()
 }
 
+/// 获取所有内置支持的模型列表关键字
+pub fn get_supported_models() -> Vec<String> {
+    CLAUDE_TO_GEMINI.keys().map(|s| s.to_string()).collect()
+}
+
+/// 动态获取所有可用模型列表 (包含内置与用户自定义)
+pub async fn get_all_dynamic_models(
+    openai_mapping: &tokio::sync::RwLock<std::collections::HashMap<String, String>>,
+    custom_mapping: &tokio::sync::RwLock<std::collections::HashMap<String, String>>,
+    anthropic_mapping: &tokio::sync::RwLock<std::collections::HashMap<String, String>>,
+) -> Vec<String> {
+    use std::collections::HashSet;
+    let mut model_ids = HashSet::new();
+
+    // 1. 获取所有内置映射模型
+    for m in get_supported_models() {
+        model_ids.insert(m);
+    }
+
+    // 2. 获取所有自定义映射模型 (OpenAI)
+    {
+        let mapping = openai_mapping.read().await;
+        for key in mapping.keys() {
+            if !key.ends_with("-series") {
+                 model_ids.insert(key.clone());
+            }
+        }
+    }
+
+    // 3. 获取所有自定义映射模型 (Custom)
+    {
+        let mapping = custom_mapping.read().await;
+        for key in mapping.keys() {
+            model_ids.insert(key.clone());
+        }
+    }
+
+    // 4. 获取所有 Anthropic 映射模型
+    {
+        let mapping = anthropic_mapping.read().await;
+        for key in mapping.keys() {
+            if !key.ends_with("-series") && key != "claude-default" {
+                model_ids.insert(key.clone());
+            }
+        }
+    }
+
+    // 5. 确保包含常用的 Gemini/画画模型 ID
+    model_ids.insert("gemini-3-pro-image".to_string());
+    model_ids.insert("gemini-3-pro-image-4k".to_string());
+    model_ids.insert("gemini-3-pro-image-16x9".to_string());
+    model_ids.insert("gemini-3-pro-image-9x16".to_string());
+    model_ids.insert("gemini-3-pro-image-4k-16x9".to_string());
+    model_ids.insert("gemini-3-pro-image-4k-9x16".to_string());
+    model_ids.insert("gemini-2.0-flash-exp".to_string());
+    model_ids.insert("gemini-2.5-flash".to_string());
+    model_ids.insert("gemini-2.5-pro".to_string());
+    model_ids.insert("gemini-3-flash".to_string());
+    model_ids.insert("gemini-3-pro-high".to_string());
+    model_ids.insert("gemini-3-pro-low".to_string());
+
+    let mut sorted_ids: Vec<_> = model_ids.into_iter().collect();
+    sorted_ids.sort();
+    sorted_ids
+}
+
 /// 核心模型路由解析引擎
 /// 优先级：Custom Mapping (精确) > Group Mapping (家族) > System Mapping (内置插件)
 pub fn resolve_model_route(
