@@ -38,7 +38,7 @@ environment/
 # Python virtual environments and test files
 .venv*/
 venv/
-*.py
+# *.py
 __pycache__/
 *.pyc
 
