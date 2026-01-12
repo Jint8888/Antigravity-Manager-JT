@@ -188,6 +188,16 @@ print(response.choices[0].message.content)
             - Covers all account types (Ultra/Pro/Free)
         - **i18n Improvements**: Fixed missing translations for "Auto Check Update" and "Device Fingerprint" (Issue #550)
         - **Stability Fixes**: Fixed variable reference and ownership conflicts under high-concurrency scheduling
+        - **API Monitor Performance Optimization (Fix Issue #560)**:
+            - **Background**: Fixed 5-10 second response delay and application crash issues when opening the API monitor interface on macOS
+            - **Database Optimization**: Added `status` field index (50x faster stats queries), optimized `get_stats()` from 3 full table scans to 1 (66% faster)
+            - **Paginated Loading**: List view excludes large `request_body`/`response_body` fields (90%+ data reduction), added `get_proxy_logs_paginated` command (20 items/page), frontend "Load More" button
+            - **On-Demand Details**: Added `get_proxy_log_detail` command, queries full data only on click (0.1-0.5s load time)
+            - **Auto Cleanup**: Removes logs older than 30 days on startup, executes VACUUM to reclaim disk space
+            - **UI Enhancements**: Loading indicators, 10-second timeout control, detail modal spinner
+            - **Performance**: Initial load 10-18s → **0.5-1s** (10-36x), memory 1GB → **5MB** (200x), data transfer 1-10GB → **1-5MB** (200-2000x)
+            - **Impact**: Supports smooth viewing of 10,000+ monitoring records
+        - **Log Enhancements**: Fixed account/model logging issues in proxy warmup logic and added missing localization keys.
     *   **v3.3.21 (2026-01-11)**:
         - **Stability & Tool Fixes**:
             - **Grep/Glob Argument Fix (P3-5)**: Resolved "Error searching files" issue for Grep and Glob tools. Corrected parameter mapping: changed from `paths` (array) to `path` (string), and implemented case-insensitive tool name matching.

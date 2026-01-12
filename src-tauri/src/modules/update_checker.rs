@@ -84,7 +84,7 @@ pub async fn check_for_updates() -> Result<UpdateInfo, String> {
     })
 }
 
-/// Compare two semantic versions (e.g., "3.3.21" vs "3.3.20")
+/// Compare two semantic versions (e.g., "3.3.22" vs "3.3.21")
 fn compare_versions(latest: &str, current: &str) -> bool {
     let parse_version = |v: &str| -> Vec<u32> {
         v.split('.')
@@ -175,11 +175,11 @@ mod tests {
 
     #[test]
     fn test_compare_versions() {
-        assert!(compare_versions("3.3.21", "3.3.20"));
-        assert!(compare_versions("3.4.0", "3.3.21"));
-        assert!(compare_versions("4.0.0", "3.3.21"));
-        assert!(!compare_versions("3.3.20", "3.3.21"));
-        assert!(!compare_versions("3.3.21", "3.3.21"));
+        assert!(compare_versions("3.3.22", "3.3.21"));
+        assert!(compare_versions("3.4.0", "3.3.22"));
+        assert!(compare_versions("4.0.0", "3.3.22"));
+        assert!(!compare_versions("3.3.21", "3.3.22"));
+        assert!(!compare_versions("3.3.22", "3.3.22"));
     }
 
     #[test]

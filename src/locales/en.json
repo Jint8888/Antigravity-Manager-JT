@@ -1,6 +1,7 @@
 {
     "common": {
         "loading": "Loading...",
+        "load_more": "Load More",
         "add": "Add",
         "action": "Action",
         "save": "Save",

@@ -135,6 +135,8 @@ pub fn run() {
             commands::proxy::get_proxy_status,
             commands::proxy::get_proxy_stats,
             commands::proxy::get_proxy_logs,
+            commands::proxy::get_proxy_logs_paginated,
+            commands::proxy::get_proxy_log_detail,
             commands::proxy::set_proxy_monitor_enabled,
             commands::proxy::clear_proxy_logs,
             commands::proxy::generate_api_key,

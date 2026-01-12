@@ -162,9 +162,35 @@ pub async fn handle_warmup(
     }
 
     // ===== 步骤 4: 处理响应 =====
+    let start_time = std::time::Instant::now();
     match result {
         Ok(response) => {
             let status = response.status();
+            let duration = start_time.elapsed().as_millis() as u64;
+            
+            // Record to monitor
+            let log = crate::proxy::monitor::ProxyRequestLog {
+                id: uuid::Uuid::new_v4().to_string(),
+                timestamp: chrono::Utc::now().timestamp(),
+                method: "POST".to_string(),
+                url: "/internal/warmup".to_string(),
+                status: status.as_u16(),
+                duration,
+                model: Some(req.model.clone()),
+                mapped_model: None,
+                account_email: Some(req.email.clone()),
+                error: if !status.is_success() {
+                    Some(format!("HTTP {}", status.as_u16()))
+                } else {
+                    None
+                },
+                request_body: None,
+                response_body: None,
+                input_tokens: None,
+                output_tokens: None,
+            };
+            state.monitor.log_request(log).await;
+            
             if status.is_success() {
                 info!(
                     "[Warmup-API] ========== SUCCESS: {} / {} ==========",
@@ -194,6 +220,27 @@ pub async fn handle_warmup(
             }
         }
         Err(e) => {
+            let duration = start_time.elapsed().as_millis() as u64;
+            
+            // Record error to monitor
+            let log = crate::proxy::monitor::ProxyRequestLog {
+                id: uuid::Uuid::new_v4().to_string(),
+                timestamp: chrono::Utc::now().timestamp(),
+                method: "POST".to_string(),
+                url: "/internal/warmup".to_string(),
+                status: 500,
+                duration,
+                model: Some(req.model.clone()),
+                mapped_model: None,
+                account_email: Some(req.email.clone()),
+                error: Some(e.clone()),
+                request_body: None,
+                response_body: None,
+                input_tokens: None,
+                output_tokens: None,
+            };
+            state.monitor.log_request(log).await;
+            
             warn!(
                 "[Warmup-API] ========== ERROR: {} / {} - {} ==========",
                 req.email, req.model, e

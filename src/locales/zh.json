@@ -1,6 +1,7 @@
 {
     "common": {
         "loading": "加载中...",
+        "load_more": "加载更多",
         "add": "添加",
         "action": "操作",
         "save": "保存",
