@@ -6,6 +6,11 @@ use std::time::{Duration, SystemTime};
 const SIGNATURE_TTL: Duration = Duration::from_secs(2 * 60 * 60);
 const MIN_SIGNATURE_LENGTH: usize = 50;
 
+// Different cache limits for different layers
+const TOOL_CACHE_LIMIT: usize = 500;      // Layer 1: Tool-specific signatures
+const FAMILY_CACHE_LIMIT: usize = 200;    // Layer 2: Model family mappings
+const SESSION_CACHE_LIMIT: usize = 1000;  // Layer 3: Session-based signatures (largest)
+
 /// Cache entry with timestamp for TTL
 #[derive(Clone, Debug)]
 struct CacheEntry<T> {
@@ -73,10 +78,14 @@ impl SignatureCache {
             tracing::debug!("[SignatureCache] Caching tool signature for id: {}", tool_use_id);
             cache.insert(tool_use_id.to_string(), CacheEntry::new(signature));
             
-            // Clean up expired entries occasionally (simple approach: unexpected check)
-            // In a production system we might want a dedicated background task
-            if cache.len() > 1000 {
+            // Clean up expired entries when limit is reached
+            if cache.len() > TOOL_CACHE_LIMIT {
+                let before = cache.len();
                 cache.retain(|_, v| !v.is_expired());
+                let after = cache.len();
+                if before != after {
+                    tracing::debug!("[SignatureCache] Tool cache cleanup: {} -> {} entries", before, after);
+                }
             }
         }
     }
@@ -104,8 +113,13 @@ impl SignatureCache {
             tracing::debug!("[SignatureCache] Caching thinking family for sig (len={}): {}", signature.len(), family);
             cache.insert(signature, CacheEntry::new(family));
             
-            if cache.len() > 1000 {
+            if cache.len() > FAMILY_CACHE_LIMIT {
+                let before = cache.len();
                 cache.retain(|_, v| !v.is_expired());
+                let after = cache.len();
+                if before != after {
+                    tracing::debug!("[SignatureCache] Family cache cleanup: {} -> {} entries", before, after);
+                }
             }
         }
     }
@@ -156,9 +170,19 @@ impl SignatureCache {
                 cache.insert(session_id.to_string(), CacheEntry::new(signature));
             }
 
-            // Cleanup on high usage
-            if cache.len() > 500 {
+            // Cleanup when limit is reached (Session cache has largest limit)
+            if cache.len() > SESSION_CACHE_LIMIT {
+                let before = cache.len();
                 cache.retain(|_, v| !v.is_expired());
+                let after = cache.len();
+                if before != after {
+                    tracing::info!(
+                        "[SignatureCache] Session cache cleanup: {} -> {} entries (limit: {})",
+                        before,
+                        after,
+                        SESSION_CACHE_LIMIT
+                    );
+                }
             }
         }
     }
