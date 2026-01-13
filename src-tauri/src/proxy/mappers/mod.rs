@@ -7,3 +7,4 @@ pub mod error_classifier;
 pub mod gemini;
 pub mod openai;
 pub mod signature_store;
+pub mod tool_result_compressor;

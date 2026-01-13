@@ -3,6 +3,7 @@
 
 use super::models::*;
 use crate::proxy::mappers::signature_store::get_thought_signature; // Deprecated, kept for fallback
+use crate::proxy::mappers::tool_result_compressor;
 use crate::proxy::session_manager::SessionManager;
 use serde_json::{json, Value};
 use std::collections::HashMap;
@@ -71,39 +72,100 @@ fn build_safety_settings() -> Value {
 /// 1. VS Code 等客户端会将历史消息(包含 cache_control)原封不动发回
 /// 2. Anthropic API 不接受请求中包含 cache_control 字段
 /// 3. 即使是转发到 Gemini,也应该清理以保持协议纯净性
+/// 
+/// [FIX #593] 增强版本:添加详细日志用于调试 MCP 工具兼容性问题
 fn clean_cache_control_from_messages(messages: &mut [Message]) {
-    for msg in messages.iter_mut() {
+    tracing::info!(
+        "[DEBUG-593] Starting cache_control cleanup for {} messages",
+        messages.len()
+    );
+    
+    let mut total_cleaned = 0;
+    
+    for (idx, msg) in messages.iter_mut().enumerate() {
         if let MessageContent::Array(blocks) = &mut msg.content {
-            for block in blocks.iter_mut() {
+            for (block_idx, block) in blocks.iter_mut().enumerate() {
                 match block {
                     ContentBlock::Thinking { cache_control, .. } => {
                         if cache_control.is_some() {
-                            tracing::debug!("[Cache-Control-Cleaner] Removed cache_control from Thinking block");
+                            tracing::warn!(
+                                "[DEBUG-593] Found cache_control in Thinking block at message[{}].content[{}]",
+                                idx,
+                                block_idx
+                            );
                             *cache_control = None;
+                            total_cleaned += 1;
                         }
                     }
                     ContentBlock::Image { cache_control, .. } => {
                         if cache_control.is_some() {
-                            tracing::debug!("[Cache-Control-Cleaner] Removed cache_control from Image block");
+                            tracing::debug!(
+                                "[Cache-Control-Cleaner] Removed cache_control from Image block at message[{}].content[{}]",
+                                idx,
+                                block_idx
+                            );
                             *cache_control = None;
+                            total_cleaned += 1;
                         }
                     }
                     ContentBlock::Document { cache_control, .. } => {
                         if cache_control.is_some() {
-                            tracing::debug!("[Cache-Control-Cleaner] Removed cache_control from Document block");
+                            tracing::debug!(
+                                "[Cache-Control-Cleaner] Removed cache_control from Document block at message[{}].content[{}]",
+                                idx,
+                                block_idx
+                            );
                             *cache_control = None;
+                            total_cleaned += 1;
                         }
                     }
                     ContentBlock::ToolUse { cache_control, .. } => {
                         if cache_control.is_some() {
-                            tracing::debug!("[Cache-Control-Cleaner] Removed cache_control from ToolUse block");
+                            tracing::debug!(
+                                "[Cache-Control-Cleaner] Removed cache_control from ToolUse block at message[{}].content[{}]",
+                                idx,
+                                block_idx
+                            );
                             *cache_control = None;
+                            total_cleaned += 1;
                         }
                     }
                     _ => {}
                 }
             }
         }
+    }
+    
+    if total_cleaned > 0 {
+        tracing::info!(
+            "[DEBUG-593] Cache control cleanup complete: removed {} cache_control fields",
+            total_cleaned
+        );
+    } else {
+        tracing::debug!("[DEBUG-593] No cache_control fields found");
+    }
+}
+
+/// [FIX #593] 递归深度清理 JSON 中的 cache_control 字段
+/// 
+/// 用于处理嵌套结构和非标准位置的 cache_control。
+/// 这是最后一道防线,确保发送给 Antigravity 的请求中不包含任何 cache_control。
+fn deep_clean_cache_control(value: &mut Value) {
+    match value {
+        Value::Object(map) => {
+            if map.remove("cache_control").is_some() {
+                tracing::debug!("[DEBUG-593] Removed cache_control from nested JSON object");
+            }
+            for (_, v) in map.iter_mut() {
+                deep_clean_cache_control(v);
+            }
+        }
+        Value::Array(arr) => {
+            for item in arr.iter_mut() {
+                deep_clean_cache_control(item);
+            }
+        }
+        _ => {}
     }
 }
 
@@ -410,6 +472,10 @@ pub fn transform_claude_request_in(
         }
     }
 
+    // [FIX #593] 最后一道防线: 递归深度清理所有 cache_control 字段
+    // 确保发送给 Antigravity 的请求中不包含任何 cache_control
+    deep_clean_cache_control(&mut body);
+    tracing::debug!("[DEBUG-593] Final deep clean complete, request ready to send");
 
     Ok(body)
 }
@@ -823,10 +889,17 @@ fn build_contents(
                                 .cloned()
                                 .unwrap_or_else(|| tool_use_id.clone());
 
+                            // [FIX #593] 工具输出压缩: 处理超大工具输出
+                            // 使用智能压缩策略(浏览器快照、大文件提示等)
+                            let mut compacted_content = content.clone();
+                            if let Some(blocks) = compacted_content.as_array_mut() {
+                                tool_result_compressor::sanitize_tool_result_blocks(blocks);
+                            }
+
                             // Smart Truncation: strict image removal
                             // Remove all Base64 images from historical tool results to save context.
                             // Only allow text.
-                            let mut merged_content = match content {
+                            let mut merged_content = match &compacted_content {
                                 serde_json::Value::String(s) => s.clone(),
                                 serde_json::Value::Array(arr) => arr
                                     .iter()
