@@ -168,7 +168,7 @@ mod test_fixes {
     #[test]
     fn test_wrap_request_with_signature() {
         let session_id = "test-session-sig";
-        let signature = "test-p9d8f7e6a5b4c3d2e1f0a9b8c7d6e5f4g3h2i1j0a9"; // > 40 chars
+        let signature = "test-signature-must-be-longer-than-fifty-characters-to-be-cached-by-signature-cache-12345"; // > 50 chars
         crate::proxy::SignatureCache::global().cache_session_signature(session_id, signature.to_string());
 
         let body = json!({
