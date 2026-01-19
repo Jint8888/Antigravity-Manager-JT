@@ -604,7 +604,10 @@ impl TokenManager {
 
             // 模式 B: 原子化 60s 全局锁定 (针对无 session_id 情况的默认保护)
             // 【修复】性能优先模式应跳过 60s 锁定；
-            if target_token.is_none() && !rotate && quota_group != "image_gen" && scheduling.mode != SchedulingMode::PerformanceFirst {
+            // [2026-01-01] 移除 image_gen 的特殊排除，让图像生成请求也使用 60s 锁定
+            // 原代码: if target_token.is_none() && !rotate && quota_group != "image_gen" && scheduling.mode != SchedulingMode::PerformanceFirst {
+            // 回滚方法: 将下行改回 if target_token.is_none() && !rotate && quota_group != "image_gen" && scheduling.mode != SchedulingMode::PerformanceFirst {
+            if target_token.is_none() && !rotate && scheduling.mode != SchedulingMode::PerformanceFirst {
                 // 【优化】使用预先获取的快照，不再在循环内加锁
                 if let Some((account_id, last_time)) = &last_used_account_id {
                     // [FIX #3] 60s 锁定逻辑应检查 `attempted` 集合，避免重复尝试失败的账号
