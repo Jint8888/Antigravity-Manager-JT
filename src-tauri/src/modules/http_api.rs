@@ -1,13 +1,13 @@
-//! HTTP API 模块
-//! 提供本地 HTTP 接口供外部程序（如 VS Code 插件）调用
+//! HTTP API Module
+//! Provides local HTTP interfaces for external programs (e.g., VS Code extension) to call.
 //! 
-//! 端点：
-//! - GET  /health                    健康检查
-//! - GET  /accounts                  获取所有账号及配额
-//! - GET  /accounts/current          获取当前账号
-//! - POST /accounts/switch           切换账号（异步执行）
-//! - POST /accounts/refresh          刷新所有配额
-//! - POST /accounts/:id/bind-device  绑定设备指纹
+//! Endpoints:
+//! - GET  /health                    Health check
+//! - GET  /accounts                  Get all accounts and quotas
+//! - GET  /accounts/current          Get current account
+//! - POST /accounts/switch           Switch account (async execution)
+//! - POST /accounts/refresh          Refresh all quotas
+//! - POST /accounts/:id/bind-device  Bind device fingerprint
 
 use axum::{
     extract::{Path, Query, State},
@@ -23,20 +23,20 @@ use tower_http::cors::{Any, CorsLayer};
 
 use crate::modules::{account, logger, proxy_db};
 
-/// HTTP API 服务器默认端口
+/// Default port for HTTP API server
 pub const DEFAULT_PORT: u16 = 19527;
 
 // ============================================================================
 // Settings
 // ============================================================================
 
-/// HTTP API 设置
+/// HTTP API Settings
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HttpApiSettings {
-    /// 是否启用 HTTP API 服务
+    /// Whether to enable HTTP API service
     #[serde(default = "default_enabled")]
     pub enabled: bool,
-    /// 监听端口
+    /// Listening port
     #[serde(default = "default_port")]
     pub port: u16,
 }
@@ -58,7 +58,7 @@ impl Default for HttpApiSettings {
     }
 }
 
-/// 加载 HTTP API 设置
+/// Load HTTP API settings
 pub fn load_settings() -> Result<HttpApiSettings, String> {
     let data_dir = crate::modules::account::get_data_dir()
         .map_err(|e| format!("Failed to get data dir: {}", e))?;
@@ -75,7 +75,7 @@ pub fn load_settings() -> Result<HttpApiSettings, String> {
         .map_err(|e| format!("Failed to parse settings: {}", e))
 }
 
-/// 保存 HTTP API 设置
+/// Save HTTP API settings
 pub fn save_settings(settings: &HttpApiSettings) -> Result<(), String> {
     let data_dir = crate::modules::account::get_data_dir()
         .map_err(|e| format!("Failed to get data dir: {}", e))?;
@@ -88,10 +88,10 @@ pub fn save_settings(settings: &HttpApiSettings) -> Result<(), String> {
         .map_err(|e| format!("Failed to write settings file: {}", e))
 }
 
-/// 服务器状态
+/// Server State
 #[derive(Clone)]
 pub struct ApiState {
-    /// 当前是否有切换操作正在进行
+    /// Whether there is a switch operation currently in progress
     switching: Arc<RwLock<bool>>,
 }
 
@@ -224,7 +224,7 @@ struct LogsRequest {
 // Handlers
 // ============================================================================
 
-/// GET /health - 健康检查
+/// GET /health - Health check
 async fn health() -> impl IntoResponse {
     Json(HealthResponse {
         status: "ok".to_string(),
@@ -232,7 +232,7 @@ async fn health() -> impl IntoResponse {
     })
 }
 
-/// GET /accounts - 获取所有账号
+/// GET /accounts - Get all accounts
 async fn list_accounts() -> Result<impl IntoResponse, (StatusCode, Json<ErrorResponse>)> {
     let accounts = account::list_accounts().map_err(|e| {
         (
@@ -278,7 +278,7 @@ async fn list_accounts() -> Result<impl IntoResponse, (StatusCode, Json<ErrorRes
     }))
 }
 
-/// GET /accounts/current - 获取当前账号
+/// GET /accounts/current - Get current account
 async fn get_current_account() -> Result<impl IntoResponse, (StatusCode, Json<ErrorResponse>)> {
     let current = account::get_current_account().map_err(|e| {
         (
@@ -313,25 +313,25 @@ async fn get_current_account() -> Result<impl IntoResponse, (StatusCode, Json<Er
     Ok(Json(CurrentAccountResponse { account: response }))
 }
 
-/// POST /accounts/switch - 切换账号
+/// POST /accounts/switch - Switch account
 async fn switch_account(
     State(state): State<ApiState>,
     Json(payload): Json<SwitchRequest>,
 ) -> Result<impl IntoResponse, (StatusCode, Json<ErrorResponse>)> {
-    // 检查是否已有切换操作在进行
+    // Check if another switch operation is already in progress
     {
         let switching = state.switching.read().await;
         if *switching {
             return Err((
                 StatusCode::CONFLICT,
                 Json(ErrorResponse {
-                    error: "另一个切换操作正在进行中".to_string(),
+                    error: "Another switch operation is already in progress".to_string(),
                 }),
             ));
         }
     }
 
-    // 标记切换开始
+    // Mark switch started
     {
         let mut switching = state.switching.write().await;
         *switching = true;
@@ -340,49 +340,49 @@ async fn switch_account(
     let account_id = payload.account_id.clone();
     let state_clone = state.clone();
 
-    // 异步执行切换（不阻塞响应）
+    // Execute switch asynchronously (non-blocking response)
     tokio::spawn(async move {
-        logger::log_info(&format!("[HTTP API] 开始切换账号: {}", account_id));
+        logger::log_info(&format!("[HTTP API] Starting account switch: {}", account_id));
         
         match account::switch_account(&account_id).await {
             Ok(()) => {
-                logger::log_info(&format!("[HTTP API] 账号切换成功: {}", account_id));
+                logger::log_info(&format!("[HTTP API] Account switch successful: {}", account_id));
             }
             Err(e) => {
-                logger::log_error(&format!("[HTTP API] 账号切换失败: {}", e));
+                logger::log_error(&format!("[HTTP API] Account switch failed: {}", e));
             }
         }
 
-        // 标记切换结束
+        // Mark switch ended
         let mut switching = state_clone.switching.write().await;
         *switching = false;
     });
 
-    // 立即返回 202 Accepted
+    // Immediately return 202 Accepted
     Ok((
         StatusCode::ACCEPTED,
         Json(SwitchResponse {
             success: true,
-            message: format!("账号切换任务已启动: {}", payload.account_id),
+            message: format!("Account switch task started: {}", payload.account_id),
         }),
     ))
 }
 
-/// POST /accounts/refresh - 刷新所有配额
+/// POST /accounts/refresh - Refresh all quotas
 async fn refresh_all_quotas() -> Result<impl IntoResponse, (StatusCode, Json<ErrorResponse>)> {
-    logger::log_info("[HTTP API] 开始刷新所有账号配额");
+    logger::log_info("[HTTP API] Starting refresh of all account quotas");
 
-    // 异步执行刷新
+    // Execute refresh asynchronously
     tokio::spawn(async {
         match account::refresh_all_quotas_logic().await {
             Ok(stats) => {
                 logger::log_info(&format!(
-                    "[HTTP API] 配额刷新完成，成功 {}/{} 个账号",
+                    "[HTTP API] Quota refresh completed, successful {}/{} accounts",
                     stats.success, stats.total
                 ));
             }
             Err(e) => {
-                logger::log_error(&format!("[HTTP API] 配额刷新失败: {}", e));
+                logger::log_error(&format!("[HTTP API] Quota refresh failed: {}", e));
             }
         }
     });
@@ -391,19 +391,19 @@ async fn refresh_all_quotas() -> Result<impl IntoResponse, (StatusCode, Json<Err
         StatusCode::ACCEPTED,
         Json(RefreshResponse {
             success: true,
-            message: "配额刷新任务已启动".to_string(),
+            message: "Quota refresh task started".to_string(),
             refreshed_count: 0,
         }),
     ))
 }
 
-/// POST /accounts/:id/bind-device - 绑定设备指纹
+/// POST /accounts/:id/bind-device - Bind device fingerprint
 async fn bind_device(
     Path(account_id): Path<String>,
     Json(payload): Json<BindDeviceRequest>,
 ) -> Result<impl IntoResponse, (StatusCode, Json<ErrorResponse>)> {
     logger::log_info(&format!(
-        "[HTTP API] 绑定设备指纹: account={}, mode={}",
+        "[HTTP API] Binding device fingerprint: account={}, mode={}",
         account_id, payload.mode
     ));
 
@@ -416,7 +416,7 @@ async fn bind_device(
 
     Ok(Json(BindDeviceResponse {
         success: true,
-        message: "设备指纹绑定成功".to_string(),
+        message: "Device fingerprint bound successfully".to_string(),
         device_profile: Some(DeviceProfileResponse {
             machine_id: result.machine_id,
             mac_machine_id: result.mac_machine_id,
@@ -426,7 +426,7 @@ async fn bind_device(
     }))
 }
 
-/// GET /logs - 获取代理日志
+/// GET /logs - Get proxy logs
 async fn get_logs(
     Query(params): Query<LogsRequest>,
 ) -> Result<impl IntoResponse, (StatusCode, Json<ErrorResponse>)> {
@@ -448,11 +448,11 @@ async fn get_logs(
 // Server
 // ============================================================================
 
-/// 启动 HTTP API 服务器
+/// Start HTTP API server
 pub async fn start_server(port: u16) -> Result<(), String> {
     let state = ApiState::new();
 
-    // CORS 配置 - 允许本地调用
+    // CORS config - allow local calls
     let cors = CorsLayer::new()
         .allow_origin(Any)
         .allow_methods(Any)
@@ -470,25 +470,25 @@ pub async fn start_server(port: u16) -> Result<(), String> {
         .with_state(state);
 
     let addr = format!("127.0.0.1:{}", port);
-    logger::log_info(&format!("[HTTP API] 启动服务器: http://{}", addr));
+    logger::log_info(&format!("[HTTP API] Starting server: http://{}", addr));
 
     let listener = tokio::net::TcpListener::bind(&addr)
         .await
-        .map_err(|e| format!("绑定端口失败: {}", e))?;
+        .map_err(|e| format!("failed_to_bind_port: {}", e))?;
 
     axum::serve(listener, app)
         .await
-        .map_err(|e| format!("服务器运行失败: {}", e))?;
+        .map_err(|e| format!("failed_to_run_server: {}", e))?;
 
     Ok(())
 }
 
-/// 在后台启动 HTTP API 服务器（非阻塞）
+/// Start HTTP API server in background (non-blocking)
 pub fn spawn_server(port: u16) {
-    // 使用 tauri::async_runtime::spawn 以确保在 Tauri 的 runtime 中运行
+    // Use tauri::async_runtime::spawn to ensure running within Tauri's runtime
     tauri::async_runtime::spawn(async move {
         if let Err(e) = start_server(port).await {
-            logger::log_error(&format!("[HTTP API] 服务器启动失败: {}", e));
+            logger::log_error(&format!("[HTTP API] Failed to start server: {}", e));
         }
     });
 }

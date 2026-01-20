@@ -1,5 +1,6 @@
 {
     "common": {
+        "empty": "空",
         "loading": "読み込み中...",
         "add": "追加",
         "copy": "コピー",
@@ -38,6 +39,7 @@
         "dashboard": "ダッシュボード",
         "accounts": "アカウント",
         "proxy": "APIプロキシ",
+        "token_stats": "統計",
         "call_records": "トラフィックログ",
         "settings": "設定",
         "theme_to_dark": "ダークモードに切り替え",
@@ -166,7 +168,8 @@
             "restored": "復元しました",
             "deleted": "削除しました",
             "directory_opened": "ストレージディレクトリを開きました",
-            "original_fingerprint_not_found": "オリジナル指紋が見つかりません"
+            "original_fingerprint_not_found": "オリジナル指紋が見つかりません",
+            "storage_json_not_found": "storage.jsonが見つかりません。Antigravityが実行され、設定ファイルが生成されていることを確認してください"
         },
         "quota_protected": "保護中",
         "details": {
@@ -255,7 +258,6 @@
             "warmup_all_msg": "対象となるすべてのアカウントに対して、直ちにウォームアップタスクを開始してもよろしいですか？これにより、Googleサービスへの最小限のトラフィックが送信され、クォータサイクルがリセットされます。",
             "warmup_all_title": "完全手動ウォームアップ"
         },
-        "device_fingerprint": "デバイス指紋",
         "import_fail": "インポートに失敗しました: {{error}}",
         "import_invalid_format": "無効なJSON形式です。ファイルにemailとrefresh_tokenフィールドが含まれていることを確認してください",
         "import_json": "インポート",
@@ -548,7 +550,12 @@
                 "max_wait": "最大待機時間 (秒)",
                 "max_wait_tooltip": "「キャッシュ優先」モードでのみ使用: レートリミットのリセット時間がこの値以下の場合、切り替えずに待機します。",
                 "clear_bindings": "セッションバインディングをクリア",
-                "clear_bindings_tooltip": "すべてのセッションとアカウントの紐付けを強制リセットし、次のリクエストでアカウントを再割り当てします。"
+                "clear_bindings_tooltip": "すべてのセッションとアカウントの紐付けを強制リセットし、次のリクエストでアカウントを再割り当てします。",
+                "fixed_account": "固定アカウントモード",
+                "fixed_account_tooltip": "有効にすると、すべてのAPIリクエストは、アカウントを切り替える代わりに、選択されたアカウントのみを使用します。",
+                "round_robin_set": "ラウンドロビンモードが有効",
+                "fixed_account_set": "固定アカウントモードが有効",
+                "account_changed": "アカウントが次へ変更されました：{{email}}"
             },
             "experimental": {
                 "title": "実験設定 (Experimental)",
@@ -819,5 +826,24 @@
             "stream_error": "ストリーム転送エラーが発生しました。後でもう一度お試しください",
             "unknown_error": "不明なエラーが発生しました。後でもう一度お試しください"
         }
+    },
+    "token_stats": {
+        "title": "トークン統計",
+        "hourly": "時間単位",
+        "daily": "日単位",
+        "weekly": "週単位",
+        "total_tokens": "総トークン",
+        "input_tokens": "入力トークン",
+        "output_tokens": "出力トークン",
+        "accounts_used": "アクティブアカウント",
+        "usage_trend": "使用傾向",
+        "input": "入力",
+        "output": "出力",
+        "no_data": "データなし",
+        "by_account": "アカウント別",
+        "account_details": "アカウント詳細",
+        "account": "アカウント",
+        "requests": "リクエスト数",
+        "total": "合計"
     }
 }

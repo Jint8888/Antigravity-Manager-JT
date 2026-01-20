@@ -2,14 +2,14 @@ mod models;
 mod modules;
 mod commands;
 mod utils;
-mod proxy;  // 反代服务模块
+mod proxy;  // Proxy service module
 pub mod error;
 
 use tauri::Manager;
 use modules::logger;
 use tracing::{info, warn, error};
 
-/// 针对 macOS 提升文件描述符限制，防止 "Too many open files" 错误
+/// Increase file descriptor limit for macOS to prevent "Too many open files" errors
 #[cfg(target_os = "macos")]
 fn increase_nofile_limit() {
     unsafe {
@@ -19,23 +19,23 @@ fn increase_nofile_limit() {
         };
         
         if libc::getrlimit(libc::RLIMIT_NOFILE, &mut rl) == 0 {
-            info!("当前文件描述符限制: soft={}, hard={}", rl.rlim_cur, rl.rlim_max);
+            info!("Current open file limit: soft={}, hard={}", rl.rlim_cur, rl.rlim_max);
             
-            // 尝试提升到 4096 或最大硬上限
+            // Attempt to increase to 4096 or maximum hard limit
             let target = 4096.min(rl.rlim_max);
             if rl.rlim_cur < target {
                 rl.rlim_cur = target;
                 if libc::setrlimit(libc::RLIMIT_NOFILE, &rl) == 0 {
-                    info!("已成功将文件描述符限制提升至 {}", target);
+                    info!("Successfully increased hard file limit to {}", target);
                 } else {
-                    warn!("提升文件描述符限制失败");
+                    warn!("Failed to increase file descriptor limit");
                 }
             }
         }
     }
 }
 
-// 测试命令
+// Test command
 #[tauri::command]
 fn greet(name: &str) -> String {
     format!("Hello, {}! You've been greeted from Rust!", name)
@@ -43,12 +43,17 @@ fn greet(name: &str) -> String {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    // 增加文件描述符限制 (仅 macOS)
+    // Increase file descriptor limit (macOS only)
     #[cfg(target_os = "macos")]
     increase_nofile_limit();
 
-    // 初始化日志
+    // Initialize logger
     logger::init_logger();
+
+    // Initialize token stats database
+    if let Err(e) = modules::token_stats::init_db() {
+        error!("Failed to initialize token stats database: {}", e);
+    }
     
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
@@ -98,31 +103,31 @@ pub fn run() {
             modules::tray::create_tray(app.handle())?;
             info!("Tray created");
             
-            // 自动启动反代服务
+            // Auto-start proxy service
             let handle = app.handle().clone();
             tauri::async_runtime::spawn(async move {
-                // 加载配置
+                // Load config
                 if let Ok(config) = modules::config::load_app_config() {
                     if config.proxy.auto_start {
                         let state = handle.state::<commands::proxy::ProxyServiceState>();
-                        // 尝试启动服务
+                        // Attempt to start service
                         if let Err(e) = commands::proxy::start_proxy_service(
                             config.proxy,
                             state,
                             handle.clone(),
                         ).await {
-                            error!("自动启动反代服务失败: {}", e);
+                            error!("Failed to auto-start proxy service: {}", e);
                         } else {
-                            info!("反代服务自动启动成功");
+                            info!("Proxy service auto-started successfully");
                         }
                     }
                 }
             });
             
-            // 启动智能调度器
+            // Start smart scheduler
             modules::scheduler::start_scheduler(app.handle().clone());
             
-            // 启动 HTTP API 服务器（供外部程序调用，如 VS Code 插件）
+            // Start HTTP API server (for external calls, e.g. VS Code plugin)
             match modules::http_api::load_settings() {
                 Ok(settings) if settings.enabled => {
                     modules::http_api::spawn_server(settings.port);
@@ -132,7 +137,7 @@ pub fn run() {
                     info!("HTTP API server is disabled in settings");
                 }
                 Err(e) => {
-                    // 加载失败时使用默认端口
+                    // Use default port if loading fails
                     error!("Failed to load HTTP API settings: {}, using default port", e);
                     modules::http_api::spawn_server(modules::http_api::DEFAULT_PORT);
                     info!("HTTP API server started on port {}", modules::http_api::DEFAULT_PORT);
@@ -154,14 +159,14 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             greet,
-            // 账号管理命令
+            // Account management commands
             commands::list_accounts,
             commands::add_account,
             commands::delete_account,
             commands::delete_accounts,
             commands::reorder_accounts,
             commands::switch_account,
-            // 设备指纹
+            // Device fingerprint
             commands::get_device_profiles,
             commands::bind_device_profile,
             commands::bind_device_profile_with_profile,
@@ -173,13 +178,13 @@ pub fn run() {
             commands::delete_device_version,
             commands::open_device_folder,
             commands::get_current_account,
-            // 配额命令
+            // Quota commands
             commands::fetch_account_quota,
             commands::refresh_all_quotas,
-            // 配置命令
+            // Config commands
             commands::load_config,
             commands::save_config,
-            // 新增命令
+            // Additional commands
             commands::prepare_oauth_url,
             commands::start_oauth_login,
             commands::complete_oauth_login,
@@ -202,7 +207,7 @@ pub fn run() {
             commands::should_check_updates,
             commands::update_last_check_time,
             commands::toggle_proxy_status,
-            // 反代服务命令
+            // Proxy service commands
             commands::proxy::start_proxy_service,
             commands::proxy::stop_proxy_service,
             commands::proxy::get_proxy_status,
@@ -224,13 +229,15 @@ pub fn run() {
             commands::proxy::get_proxy_scheduling_config,
             commands::proxy::update_proxy_scheduling_config,
             commands::proxy::clear_proxy_session_bindings,
-            // Autostart 命令
+            commands::proxy::set_preferred_account,
+            commands::proxy::get_preferred_account,
+            // Autostart commands
             commands::autostart::toggle_auto_launch,
             commands::autostart::is_auto_launch_enabled,
-            // 预热命令
+            // Warmup commands
             commands::warm_up_all_accounts,
             commands::warm_up_account,
-            // HTTP API 设置命令
+            // HTTP API settings commands
             commands::get_http_api_settings,
             commands::save_http_api_settings,
             // Token 统计命令

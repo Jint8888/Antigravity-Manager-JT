@@ -1,5 +1,5 @@
 # Antigravity Tools 🚀
-> 专业的 AI 账号管理与协议反代系统 (v3.3.44)
+> 专业的 AI 账号管理与协议反代系统 (v3.3.45)
 <div align="center">
   <img src="public/icon.png" alt="Antigravity Logo" width="120" height="120" style="border-radius: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.15);">
 
@@ -8,7 +8,7 @@
   
   <p>
     <a href="https://github.com/lbjlaq/Antigravity-Manager">
-      <img src="https://img.shields.io/badge/Version-3.3.44-blue?style=flat-square" alt="Version">
+      <img src="https://img.shields.io/badge/Version-3.3.45-blue?style=flat-square" alt="Version">
     </a>
     <img src="https://img.shields.io/badge/Tauri-v2-orange?style=flat-square" alt="Tauri">
     <img src="https://img.shields.io/badge/Backend-Rust-red?style=flat-square" alt="Rust">
@@ -131,6 +131,13 @@ brew install --cask antigravity-tools
 *   **Windows**: `.msi` 或 便携版 `.zip`
 *   **Linux**: `.deb` 或 `AppImage`
 
+### 选项 C: Arch Linux (官方脚本)
+我们为 Arch Linux 用户提供了一个官方的一键安装脚本，它会自动从 GitHub 获取最新版本并完成安装：
+```bash
+curl -sSL https://raw.githubusercontent.com/lbjlaq/Antigravity-Manager/main/deploy/arch/install.sh | bash
+```
+> **提示**: 该脚本会自动下载最新的 `.deb` 资产并使用 `makepkg` 进行安装。
+
 ### 选项 C: 远程服务器部署 (Headless Linux)
 如果您需要在无界面的远程 Linux 服务器（如 Ubuntu/Debian/CentOS）上运行，可以使用我们提供的 **Headless (Xvfb)** 一键部署方案：
 
@@ -139,6 +146,23 @@ curl -fsSL https://raw.githubusercontent.com/lbjlaq/Antigravity-Manager/main/dep
 ```
 > **注意**: 该方案通过 Xvfb 模拟图形环境，资源占用（内存/CPU）会高于纯后端应用。
 > **详情见**: [服务器部署指南 (deploy/headless-xvfb)](./deploy/headless-xvfb/README.md)
+
+### 选项 D: Docker 部署 (推荐用于 NAS/服务器)
+如果您希望在容器化环境中运行，我们提供了完整的 Docker 镜像和配置，内置 noVNC 支持，可通过浏览器直接访问图形界面。
+
+```bash
+# 1. 进入部署目录
+cd deploy/docker
+
+# 2. 启动服务
+docker compose up -d
+```
+> **访问地址**: `http://localhost:6080/vnc_lite.html` (默认 VNC 密码: `password`)
+> **系统要求**:
+> - **内存**: 建议 **2GB** (最小 512MB)。
+> - **共享内存**: 需设置 `shm_size: 2gb` (已在 compose 中配置)，防止浏览器崩溃。
+> - **架构**: 支持 x86_64 和 ARM64。
+> **详情见**: [Docker 部署指南 (deploy/docker)](./deploy/docker/README.md)
 
 ---
 
@@ -205,6 +229,38 @@ print(response.choices[0].message.content)
 ## 📝 开发者与社区
 
 *   **版本演进 (Changelog)**:
+    *   **v3.3.45 (2026-01-19)**:
+        - **[核心功能] 彻底解决 Claude/Gemini SSE 中断与 0-token 响应问题 (Issue #859)**:
+            - **增强型预读 (Peek) 逻辑**: 在向客户端发送 200 OK 响应前，代理现在会循环预读并跳过所有心跳包（SSE ping）及空数据块，确认收到有效业务内容后再建立连接。
+            - **智能重试触发**: 若在预读阶段检测到空响应、超时（60s）或流异常中断，系统将自动触发账号轮换和重试机制，解决了长延迟模型下的静默失败。
+            - **协议一致性增强**: 为 Gemini 协议补齐了缺失的预读逻辑；同时将 Claude 心跳间隔优化为 30s，减少了生成长文本时的连接干扰。
+        - **[核心功能] 固定账号模式集成 (PR #842)**:
+            - **后端增强**: 在代理核心中引入了 `preferred_account_id` 支持，允许通过 API 或 UI 强制锁定特定账号进行请求调度。
+            - **UI 交互更新**: 在 API 反代页面新增“固定账号”切换与账号选择器，支持实时锁定当前会话的出口账号。
+            - **调度优化**: 在“固定账号模式”下优先级高于传统轮询，确保特定业务场景下的会话连续性。
+        - **[国际化] 全语言翻译补全与清理**:
+            - **8 语言覆盖**: 补全了中、英、繁中、日、土、越、葡、俄等 8 种语言中关于“固定账号模式”的所有 i18n 翻译项。
+            - **冗余清理**: 修复了 `ja.json` 和 `vi.json` 中由于历史 PR 累积导致的重复键（Duplicate Keys）警告，提升了翻译规范性。
+            - **标点同步**: 统一清除了各语言翻译中误用的全角标点，确保 UI 展示的一致性。
+        - **[核心功能] 客户端热更新与 Token 统计系统 (PR #846 by @lengjingxu)**:
+            - **热更新 (Native Updater)**: 集成 Tauri v2 原生更新插件，支持自动检测、下载、安装及重启，实现客户端无感升级。
+            - **Token 消费可视化**: 新增基于 SQLite 实现的 Token 统计持久化模块，支持按小时/日/周维度查看总消耗及各账号占比。
+            - **UI/UX 增强**: 优化了图表悬浮提示 (Tooltip) 在深色模式下的对比度，隐藏了冗余的 hover 高亮；补全了 8 语言完整翻译并修复了硬编码图例。
+            - **集成修复**: 在本地合并期间修复了 PR 原始代码中缺失插件配置导致的启动崩溃故障。
+        - **[系统加速] 启用清华大学 (TUNA) 镜像源**: 优化了 Dockerfile 构建流程，大幅提升国内环境下的插件安装速度。
+        - **[部署优化] 官方 Docker 与 noVNC 支持 (PR #851)**:
+            - **全功能容器化**: 为 headless 环境提供完整的 Docker 部署方案，内置 Openbox 桌面环境。
+            - **Web VNC 集成**: 集成 noVNC，支持通过浏览器直接访问图形界面进行 OAuth 授权（内置 Firefox ESR）。
+            - **自愈启动流**: 优化了 `start.sh` 启动逻辑，支持自动清理 X11 锁文件及服务崩溃自动退出，提升生产环境稳定性。
+            - **多语言适配**: 内置 CJK 字体，确保 Docker 环境下中文字符正常显示。
+            - **资源限制优化**: 统一设置 `shm_size: 2gb`，彻底解决容器内浏览器及图形界面崩溃问题。
+        - **[核心功能] 修复账号切换时的设备指纹同步问题**:
+            - **路径探测改进**: 优化了 `storage.json` 的探测时机，确保在进程关闭前准确获取路径，兼容自定义数据目录。
+            - **自动隔离生成**: 针对未绑定指纹的账号，在切换时会自动生成并绑定唯一的设备标识，实现账号间的彻底指纹隔离。
+        - **[UI 修复] 修复账号管理页条数显示不准确问题 (Issue #754)**:
+            - **逻辑修正**: 强制分页条数默认最低为 10 条，解决了小窗口下自动变为 5 条或 9 条的不直觉体验。
+            - **持久化增强**: 实现了分页大小的 `localStorage` 持久化，用户手动选择的条数将永久锁定并覆盖自动模式。
+            - **UI 一致性**: 确保右下角分页选项与列表实际展示条数始终保持一致。
     *   **v3.3.44 (2026-01-19)**:
         - **[核心稳定性] 动态思维剥离 (Dynamic Thinking Stripping) - 彻底解决 Prompt 过长与签名错误**:
             - **问题背景**: 在 Deep Thinking 模式下,长对话会导致两类致命错误:

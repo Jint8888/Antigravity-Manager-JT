@@ -105,10 +105,18 @@ pub async fn reorder_accounts(account_ids: Vec<String>) -> Result<(), String> {
 
 /// 切换账号
 #[tauri::command]
-pub async fn switch_account(app: tauri::AppHandle, account_id: String) -> Result<(), String> {
+pub async fn switch_account(
+    app: tauri::AppHandle,
+    proxy_state: tauri::State<'_, crate::commands::proxy::ProxyServiceState>,
+    account_id: String,
+) -> Result<(), String> {
     let res = modules::switch_account(&account_id).await;
     if res.is_ok() {
         crate::modules::tray::update_tray_menus(&app);
+
+        // [FIX #820] Notify proxy to clear stale session bindings and reload accounts
+        // This prevents API requests from routing to the wrong account after switching
+        let _ = crate::commands::proxy::reload_proxy_accounts(proxy_state).await;
     }
     res
 }

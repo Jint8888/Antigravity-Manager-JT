@@ -41,9 +41,9 @@ pub fn create_claude_sse_stream(
         let mut buffer = BytesMut::new();
 
         loop {
-            // [NEW] 15秒心跳保活: 如果长时间无数据，发送 ping 包
+            // [NEW] 30秒心跳保活: 延长超时时间以兼容长延迟模型
             let next_chunk = tokio::time::timeout(
-                std::time::Duration::from_secs(15),
+                std::time::Duration::from_secs(30),
                 gemini_stream.next()
             ).await;
 

@@ -1,5 +1,5 @@
 # Antigravity Tools 🚀
-> Professional AI Account Management & Proxy System (v3.3.44)
+> Professional AI Account Management & Proxy System (v3.3.45)
 
 <div align="center">
   <img src="public/icon.png" alt="Antigravity Logo" width="120" height="120" style="border-radius: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.15);">
@@ -9,7 +9,7 @@
   
   <p>
     <a href="https://github.com/lbjlaq/Antigravity-Manager">
-      <img src="https://img.shields.io/badge/Version-3.3.44-blue?style=flat-square" alt="Version">
+      <img src="https://img.shields.io/badge/Version-3.3.45-blue?style=flat-square" alt="Version">
     </a>
     <img src="https://img.shields.io/badge/Tauri-v2-orange?style=flat-square" alt="Tauri">
     <img src="https://img.shields.io/badge/Backend-Rust-red?style=flat-square" alt="Rust">
@@ -132,6 +132,13 @@ Download from [GitHub Releases](https://github.com/lbjlaq/Antigravity-Manager/re
 *   **Windows**: `.msi` or portable `.zip`
 *   **Linux**: `.deb` or `AppImage`
 
+### Option C: Arch Linux (Official Script)
+We provide an official one-liner installation script for Arch Linux users. It automatically fetches the latest release from GitHub and installs it:
+```bash
+curl -sSL https://raw.githubusercontent.com/lbjlaq/Antigravity-Manager/main/deploy/arch/install.sh | bash
+```
+> **Tip**: This script will automatically download the latest `.deb` assets and install them using `makepkg`.
+
 ### Option C: Remote Server Deployment (Headless Linux)
 If you need to run on a headless remote Linux server (Ubuntu/Debian/CentOS), use our **Headless (Xvfb)** one-click deployment solution:
 
@@ -140,6 +147,23 @@ curl -fsSL https://raw.githubusercontent.com/lbjlaq/Antigravity-Manager/main/dep
 ```
 > **Note**: This solution uses Xvfb to simulate a GUI environment. Resource consumption (RAM/CPU) will be higher than a native backend service.
 > **See**: [Server Deployment Guide (deploy/headless-xvfb)](./deploy/headless-xvfb/README.md)
+
+### Option D: Docker Deployment (Recommended for NAS/Servers)
+If you prefer running in a containerized environment, we provide a full Docker image and configuration with built-in noVNC support for direct browser-based GUI access.
+
+```bash
+# 1. Enter the deployment directory
+cd deploy/docker
+
+# 2. Start the service
+docker compose up -d
+```
+> **Access URL**: `http://localhost:6080/vnc_lite.html` (Default VNC password: `password`)
+> **System Requirements**:
+> - **RAM**: **2GB** recommended (minimum 512MB).
+> - **Shared Memory**: Requires `shm_size: 2gb` (pre-configured in compose) to prevent browser crashes.
+> - **Architecture**: Supports x86_64 and ARM64.
+> **See**: [Docker Deployment Guide (deploy/docker)](./deploy/docker/README.md)
 
 ### 🛠️ Troubleshooting
 
@@ -187,6 +211,38 @@ print(response.choices[0].message.content)
 ## 📝 Developer & Community
 
 *   **Changelog**:
+    *   **v3.3.45 (2026-01-19)**:
+        - **[Core] Critical Fix for Claude/Gemini SSE Interruptions & 0-Token Responses (Issue #859)**:
+            - **Enhanced Peek Logic**: The proxy now loops through initial SSE chunks to filter out heartbeat pings and empty data, ensuring a valid content block is received before committing to a 200 OK response.
+            - **Smart Retry Trigger**: If no valid data is received within 60s or the stream is interrupted during the peek phase, the system automatically triggers account rotation and retries, eliminating silent failures for long-latency models.
+            - **Protocol Alignment & Optimization**: Introduced a matching peek mechanism for Gemini and relaxed Claude's heartbeat interval to 30s to improve stability during long-form content generation.
+        - **[Core] Fixed Account Mode Integration (PR #842)**:
+            - **Backend Enhancement**: Introduced `preferred_account_id` support in the proxy core, allowing mandatory locking of specific accounts via API or UI.
+            - **UI Update**: Added a "Fixed Account" toggle and account selector in the API Proxy page to lock the outbound account for the current session.
+            - **Scheduling Optimization**: Fixed Account Mode takes precedence over traditional round-robin, ensuring session continuity for specific business scenarios.
+        - **[i18n] Full Translation Completion & Cleanup**:
+            - **8-Language Coverage**: Completed all i18n translation keys related to "Fixed Account Mode" for all 8 supported languages.
+            - **Redundant Key Cleanup**: Fixed "Duplicate Keys" lint warnings in `ja.json` and `vi.json` caused by historical PR accumulation.
+            - **Punctuation Sync**: Standardized punctuation across Russian and Portuguese translations, removing accidentally used full-width Chinese punctuation.
+        - **[Core Feature] Client Hot Update & Token Statistics (PR #846 by @lengjingxu)**:
+            - **Native Updater**: Integrated Tauri v2 native update plugin, supporting automatic detection, downloading, installation, and restarting for seamless client upgrades.
+            - **Token Consumption Visualization**: Added an SQLite-based Token statistics persistence module, supporting total and per-account usage views by hour/day/week.
+            - **UI/UX & i18n Enhancements**: Optimized chart tooltips for better Dark Mode contrast; completed full translation for all 8 languages and fixed hardcoded legend labels.
+            - **Integration Fix**: Fixed an application crash caused by missing plugin configurations found during the manual merge of the original PR code.
+        - **[Optimization] Tsinghua (TUNA) Mirror Support**: Optimized the Dockerfile build process, significantly improving package installation speed in mainland China.
+        - **[Deployment] Official Docker & noVNC Support (PR #851)**:
+            - **Full Containerization**: Provides a complete Docker deployment solution for headless environments, with built-in Openbox WM.
+            - **Web VNC Integration**: Integrated noVNC for direct browser-based GUI access (essential for OAuth flows, with Firefox ESR included).
+            - **Self-Healing Startup**: Optimized `start.sh` with X11 lock file cleanup and service crash monitoring for enterprise-grade stability.
+            - **i18n Readiness**: Built-in CJK fonts ensuring proper rendering of Chinese characters in the Docker environment.
+            - **Performance Tuning**: Standardized `shm_size: 2gb` to eliminate container browser and GUI crashes.
+        - **[Core Feature] Fixed Device Fingerprint Synchronization on Account Switch**:
+            - **Path Detection Improvement**: Optimized the timing of `storage.json` detection to ensure accurate path acquisition before process closure, compatible with custom data directories.
+            - **Automatic Isolation Generation**: For accounts without a bound fingerprint, a unique device identifier is now automatically generated and bound during the first switch, ensuring complete fingerprint isolation between accounts.
+        - **[UI Fix] Fixed Inaccurate Page Size Display on Account Management Page (Issue #754)**:
+            - **Logic Correction**: Forced the default minimum page size to 10, resolving the unintuitive experience where it would automatically change to 5 or 9 in small windows.
+            - **Persistence Enhancement**: Implemented `localStorage` persistence for page size. Manually selected page sizes now permanently lock and override the automatic mode.
+            - **UI Consistency**: Ensured the pagination dropdown always aligns with the actual number of items displayed in the list.
     *   **v3.3.44 (2026-01-19)**:
         - **[Core Stability] Dynamic Thinking Stripping - Complete Fix for Prompt Too Long & Signature Errors**:
             - **Background**: In Deep Thinking mode, long conversations cause two critical errors:

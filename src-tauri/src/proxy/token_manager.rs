@@ -32,6 +32,7 @@ pub struct TokenManager {
     rate_limit_tracker: Arc<RateLimitTracker>,  // 新增: 限流跟踪器
     sticky_config: Arc<tokio::sync::RwLock<StickySessionConfig>>, // 新增：调度配置
     session_accounts: Arc<DashMap<String, String>>, // 新增：会话与账号映射 (SessionID -> AccountID)
+    preferred_account_id: Arc<tokio::sync::RwLock<Option<String>>>, // [FIX #820] 优先使用的账号ID（固定账号模式）
 }
 
 impl TokenManager {
@@ -45,6 +46,7 @@ impl TokenManager {
             rate_limit_tracker: Arc::new(RateLimitTracker::new()),
             sticky_config: Arc::new(tokio::sync::RwLock::new(StickySessionConfig::default())),
             session_accounts: Arc::new(DashMap::new()),
+            preferred_account_id: Arc::new(tokio::sync::RwLock::new(None)), // [FIX #820]
         }
     }
 
@@ -543,6 +545,81 @@ impl TokenManager {
         let quota_protection_enabled = crate::modules::config::load_app_config()
             .map(|cfg| cfg.quota_protection.enabled)
             .unwrap_or(false);
+
+        // ===== [FIX #820] 固定账号模式：优先使用指定账号 =====
+        let preferred_id = self.preferred_account_id.read().await.clone();
+        if let Some(ref pref_id) = preferred_id {
+            // 查找优先账号
+            if let Some(preferred_token) = tokens_snapshot.iter().find(|t| &t.account_id == pref_id) {
+                // 检查账号是否可用（未限流、未被配额保护）
+                let normalized_target = crate::proxy::common::model_mapping::normalize_to_standard_id(target_model)
+                    .unwrap_or_else(|| target_model.to_string());
+
+                let is_rate_limited = self.is_rate_limited_by_account_id(&preferred_token.account_id);
+                let is_quota_protected = quota_protection_enabled && preferred_token.protected_models.contains(&normalized_target);
+
+                if !is_rate_limited && !is_quota_protected {
+                    tracing::info!(
+                        "🔒 [FIX #820] Using preferred account: {} (fixed mode)",
+                        preferred_token.email
+                    );
+
+                    // 直接使用优先账号，跳过轮询逻辑
+                    let mut token = preferred_token.clone();
+
+                    // 检查 token 是否过期（提前5分钟刷新）
+                    let now = chrono::Utc::now().timestamp();
+                    if now >= token.timestamp - 300 {
+                        tracing::debug!("账号 {} 的 token 即将过期，正在刷新...", token.email);
+                        match crate::modules::oauth::refresh_access_token(&token.refresh_token).await {
+                            Ok(token_response) => {
+                                token.access_token = token_response.access_token.clone();
+                                token.expires_in = token_response.expires_in;
+                                token.timestamp = now + token_response.expires_in;
+
+                                if let Some(mut entry) = self.tokens.get_mut(&token.account_id) {
+                                    entry.access_token = token.access_token.clone();
+                                    entry.expires_in = token.expires_in;
+                                    entry.timestamp = token.timestamp;
+                                }
+                                let _ = self.save_refreshed_token(&token.account_id, &token_response).await;
+                            }
+                            Err(e) => {
+                                tracing::warn!("Preferred account token refresh failed: {}", e);
+                                // 继续使用旧 token，让后续逻辑处理失败
+                            }
+                        }
+                    }
+
+                    // 确保有 project_id
+                    let project_id = if let Some(pid) = &token.project_id {
+                        pid.clone()
+                    } else {
+                        match crate::proxy::project_resolver::fetch_project_id(&token.access_token).await {
+                            Ok(pid) => {
+                                if let Some(mut entry) = self.tokens.get_mut(&token.account_id) {
+                                    entry.project_id = Some(pid.clone());
+                                }
+                                let _ = self.save_project_id(&token.account_id, &pid).await;
+                                pid
+                            }
+                            Err(_) => "bamboo-precept-lgxtn".to_string() // fallback
+                        }
+                    };
+
+                    return Ok((token.access_token, project_id, token.email));
+                } else {
+                    if is_rate_limited {
+                        tracing::warn!("🔒 [FIX #820] Preferred account {} is rate-limited, falling back to round-robin", preferred_token.email);
+                    } else {
+                        tracing::warn!("🔒 [FIX #820] Preferred account {} is quota-protected for {}, falling back to round-robin", preferred_token.email, target_model);
+                    }
+                }
+            } else {
+                tracing::warn!("🔒 [FIX #820] Preferred account {} not found in pool, falling back to round-robin", pref_id);
+            }
+        }
+        // ===== [END FIX #820] =====
 
         // 【优化 Issue #284】将锁操作移到循环外，避免重复获取锁
         // 预先获取 last_used_account 的快照，避免在循环中多次加锁
@@ -1362,6 +1439,25 @@ impl TokenManager {
     /// 清除所有会话的粘性映射
     pub fn clear_all_sessions(&self) {
         self.session_accounts.clear();
+    }
+
+    // ===== [FIX #820] 固定账号模式相关方法 =====
+
+    /// 设置优先使用的账号ID（固定账号模式）
+    /// 传入 Some(account_id) 启用固定账号模式，传入 None 恢复轮询模式
+    pub async fn set_preferred_account(&self, account_id: Option<String>) {
+        let mut preferred = self.preferred_account_id.write().await;
+        if let Some(ref id) = account_id {
+            tracing::info!("🔒 [FIX #820] Fixed account mode enabled: {}", id);
+        } else {
+            tracing::info!("🔄 [FIX #820] Round-robin mode enabled (no preferred account)");
+        }
+        *preferred = account_id;
+    }
+
+    /// 获取当前优先使用的账号ID
+    pub async fn get_preferred_account(&self) -> Option<String> {
+        self.preferred_account_id.read().await.clone()
     }
 }
 

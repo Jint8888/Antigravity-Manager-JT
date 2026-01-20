@@ -325,8 +325,13 @@ pub async fn reload_proxy_accounts(
     state: State<'_, ProxyServiceState>,
 ) -> Result<usize, String> {
     let instance_lock = state.instance.read().await;
-    
+
     if let Some(instance) = instance_lock.as_ref() {
+        // [FIX #820] Clear stale session bindings before reloading accounts
+        // This ensures that after switching accounts in the UI, API requests
+        // won't be routed to the previously bound (wrong) account
+        instance.token_manager.clear_all_sessions();
+
         // 重新加载账号
         let count = instance.token_manager.load_accounts().await
             .map_err(|e| format!("重新加载账号失败: {}", e))?;
@@ -509,6 +514,39 @@ pub async fn clear_proxy_session_bindings(
         Ok(())
     } else {
         Err("服务未运行".to_string())
+    }
+}
+
+// ===== [FIX #820] 固定账号模式命令 =====
+
+/// 设置优先使用的账号（固定账号模式）
+/// 传入 account_id 启用固定模式，传入 null/空字符串恢复轮询模式
+#[tauri::command]
+pub async fn set_preferred_account(
+    state: State<'_, ProxyServiceState>,
+    account_id: Option<String>,
+) -> Result<(), String> {
+    let instance_lock = state.instance.read().await;
+    if let Some(instance) = instance_lock.as_ref() {
+        // 过滤空字符串为 None
+        let cleaned_id = account_id.filter(|s| !s.trim().is_empty());
+        instance.token_manager.set_preferred_account(cleaned_id).await;
+        Ok(())
+    } else {
+        Err("服务未运行".to_string())
+    }
+}
+
+/// 获取当前优先使用的账号ID
+#[tauri::command]
+pub async fn get_preferred_account(
+    state: State<'_, ProxyServiceState>,
+) -> Result<Option<String>, String> {
+    let instance_lock = state.instance.read().await;
+    if let Some(instance) = instance_lock.as_ref() {
+        Ok(instance.token_manager.get_preferred_account().await)
+    } else {
+        Ok(None)
     }
 }
 

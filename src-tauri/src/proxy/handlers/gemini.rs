@@ -108,76 +108,119 @@ pub async fn handle_generate(
                 let mut buffer = BytesMut::new();
                 let s_id = session_id.clone(); // Clone for stream closure
 
-                let stream = async_stream::stream! {
-                    while let Some(item) = response_stream.next().await {
-                        match item {
-                            Ok(bytes) => {
-                                debug!("[Gemini-SSE] Received chunk: {} bytes", bytes.len());
-                                buffer.extend_from_slice(&bytes);
-                                while let Some(pos) = buffer.iter().position(|&b| b == b'\n') {
-                                    let line_raw = buffer.split_to(pos + 1);
-                                    if let Ok(line_str) = std::str::from_utf8(&line_raw) {
-                                        let line = line_str.trim();
-                                        if line.is_empty() { continue; }
-                                        
-                                        if line.starts_with("data: ") {
-                                            let json_part = line.trim_start_matches("data: ").trim();
-                                            if json_part == "[DONE]" {
-                                                yield Ok::<Bytes, String>(Bytes::from("data: [DONE]\n\n"));
-                                                continue;
-                                            }
-                                            
-                                            match serde_json::from_str::<Value>(json_part) {
-                                                Ok(mut json) => {
-                                                    // [FIX #765] Extract thoughtSignature from stream
-                                                    let inner_val = if json.get("response").is_some() {
-                                                        json.get("response")
-                                                    } else {
-                                                        Some(&json)
-                                                    };
+                // [FIX #859] Implement peek logic for Gemini stream to prevent 0-token 200 OK
+                let mut first_chunk = None;
+                let mut retry_gemini = false;
 
-                                                    if let Some(resp) = inner_val {
-                                                        if let Some(candidates) = resp.get("candidates").and_then(|c| c.as_array()) {
-                                                            for cand in candidates {
-                                                                if let Some(parts) = cand.get("content").and_then(|c| c.get("parts")).and_then(|p| p.as_array()) {
-                                                                    for part in parts {
-                                                                        if let Some(sig) = part.get("thoughtSignature").and_then(|s| s.as_str()) {
-                                                                            crate::proxy::SignatureCache::global().cache_session_signature(&s_id, sig.to_string());
-                                                                            debug!("[Gemini-SSE] Cached signature (len: {}) for session: {}", sig.len(), s_id);
-                                                                        }
-                                                                    }
+                match tokio::time::timeout(std::time::Duration::from_secs(30), response_stream.next()).await {
+                    Ok(Some(Ok(bytes))) => {
+                        if bytes.is_empty() {
+                            tracing::warn!("[Gemini] Empty first chunk received, retrying...");
+                            retry_gemini = true;
+                        } else {
+                            first_chunk = Some(bytes);
+                        }
+                    }
+                    Ok(Some(Err(e))) => {
+                        tracing::warn!("[Gemini] Stream error during peek: {}, retrying...", e);
+                        last_error = format!("Stream error: {}", e);
+                        retry_gemini = true;
+                    }
+                    Ok(None) => {
+                        tracing::warn!("[Gemini] Stream ended immediately, retrying...");
+                        last_error = "Empty response".to_string();
+                        retry_gemini = true;
+                    }
+                    Err(_) => {
+                        tracing::warn!("[Gemini] Timeout waiting for first chunk, retrying...");
+                        last_error = "Timeout".to_string();
+                        retry_gemini = true;
+                    }
+                }
+
+                if retry_gemini {
+                    continue;
+                }
+
+                let stream = async_stream::stream! {
+                    let mut first_data = first_chunk;
+                    loop {
+                        let item = if let Some(fd) = first_data.take() {
+                            Some(Ok(fd))
+                        } else {
+                            response_stream.next().await
+                        };
+
+                        let bytes = match item {
+                            Some(Ok(b)) => b,
+                            Some(Err(e)) => {
+                                error!("[Gemini-SSE] Connection error: {}", e);
+                                yield Err(format!("Stream error: {}", e));
+                                break;
+                            }
+                            None => break,
+                        };
+
+                        debug!("[Gemini-SSE] Received chunk: {} bytes", bytes.len());
+                        buffer.extend_from_slice(&bytes);
+                        while let Some(pos) = buffer.iter().position(|&b| b == b'\n') {
+                            let line_raw = buffer.split_to(pos + 1);
+                            if let Ok(line_str) = std::str::from_utf8(&line_raw) {
+                                let line = line_str.trim();
+                                if line.is_empty() { continue; }
+                                
+                                if line.starts_with("data: ") {
+                                    let json_part = line.trim_start_matches("data: ").trim();
+                                    if json_part == "[DONE]" {
+                                        yield Ok::<Bytes, String>(Bytes::from("data: [DONE]\n\n"));
+                                        continue;
+                                    }
+                                    
+                                    match serde_json::from_str::<Value>(json_part) {
+                                        Ok(mut json) => {
+                                            // [FIX #765] Extract thoughtSignature from stream
+                                            let inner_val = if json.get("response").is_some() {
+                                                json.get("response")
+                                            } else {
+                                                Some(&json)
+                                            };
+
+                                            if let Some(resp) = inner_val {
+                                                if let Some(candidates) = resp.get("candidates").and_then(|c| c.as_array()) {
+                                                    for cand in candidates {
+                                                        if let Some(parts) = cand.get("content").and_then(|c| c.get("parts")).and_then(|p| p.as_array()) {
+                                                            for part in parts {
+                                                                if let Some(sig) = part.get("thoughtSignature").and_then(|s| s.as_str()) {
+                                                                    crate::proxy::SignatureCache::global().cache_session_signature(&s_id, sig.to_string());
+                                                                    debug!("[Gemini-SSE] Cached signature (len: {}) for session: {}", sig.len(), s_id);
                                                                 }
                                                             }
                                                         }
                                                     }
-
-                                                    // Unwrap v1internal response wrapper
-                                                    if let Some(inner) = json.get_mut("response").map(|v| v.take()) {
-                                                        let new_line = format!("data: {}\n\n", serde_json::to_string(&inner).unwrap_or_default());
-                                                        yield Ok::<Bytes, String>(Bytes::from(new_line));
-                                                    } else {
-                                                        yield Ok::<Bytes, String>(Bytes::from(format!("data: {}\n\n", serde_json::to_string(&json).unwrap_or_default())));
-                                                    }
-                                                }
-                                                Err(e) => {
-                                                    debug!("[Gemini-SSE] JSON parse error: {}, passing raw line", e);
-                                                    yield Ok::<Bytes, String>(Bytes::from(format!("{}\n\n", line)));
                                                 }
                                             }
-                                        } else {
-                                            // Non-data lines (comments, etc.)
+
+                                            // Unwrap v1internal response wrapper
+                                            if let Some(inner) = json.get_mut("response").map(|v| v.take()) {
+                                                let new_line = format!("data: {}\n\n", serde_json::to_string(&inner).unwrap_or_default());
+                                                yield Ok::<Bytes, String>(Bytes::from(new_line));
+                                            } else {
+                                                yield Ok::<Bytes, String>(Bytes::from(format!("data: {}\n\n", serde_json::to_string(&json).unwrap_or_default())));
+                                            }
+                                        }
+                                        Err(e) => {
+                                            debug!("[Gemini-SSE] JSON parse error: {}, passing raw line", e);
                                             yield Ok::<Bytes, String>(Bytes::from(format!("{}\n\n", line)));
                                         }
-                                    } else {
-                                        // Non-UTF8 data? Just pass it through or skip
-                                        debug!("[Gemini-SSE] Non-UTF8 line encountered");
-                                        yield Ok::<Bytes, String>(line_raw.freeze());
                                     }
+                                } else {
+                                    // Non-data lines (comments, etc.)
+                                    yield Ok::<Bytes, String>(Bytes::from(format!("{}\n\n", line)));
                                 }
-                            }
-                            Err(e) => {
-                                error!("[Gemini-SSE] Connection error: {}", e);
-                                yield Err(format!("Stream error: {}", e));
+                            } else {
+                                // Non-UTF8 data? Just pass it through or skip
+                                debug!("[Gemini-SSE] Non-UTF8 line encountered");
+                                yield Ok::<Bytes, String>(line_raw.freeze());
                             }
                         }
                     }

@@ -29,7 +29,11 @@ export default function DeviceFingerprintDialog({ account, onClose }: DeviceFing
             const res = await accountService.getDeviceProfiles(target.id);
             setDeviceProfiles(res);
         } catch (e: any) {
-            setActionMessage(typeof e === 'string' ? e : t('accounts.device_fingerprint_dialog.failed_to_load_device_info'));
+            const errorMsg = typeof e === 'string' ? e : e.message || '';
+            const translated = errorMsg === 'storage_json_not_found'
+                ? t('accounts.device_fingerprint_dialog.storage_json_not_found')
+                : (typeof e === 'string' ? e : t('accounts.device_fingerprint_dialog.failed_to_load_device_info'));
+            setActionMessage(translated);
         } finally {
             setLoadingDevice(false);
         }

@@ -1,5 +1,6 @@
 {
     "common": {
+        "empty": "空",
         "loading": "載入中...",
         "load_more": "載入更多",
         "add": "新增",
@@ -38,6 +39,7 @@
         "dashboard": "儀表板",
         "accounts": "帳號管理",
         "proxy": "API 反向代理",
+        "token_stats": "統計",
         "call_records": "流量日誌",
         "settings": "設定",
         "theme_to_dark": "切換到深色模式",
@@ -162,7 +164,8 @@
             "restored": "已恢復",
             "deleted": "已刪除",
             "directory_opened": "已開啟裝置儲存目錄",
-            "original_fingerprint_not_found": "未找到原始指紋"
+            "original_fingerprint_not_found": "未找到原始指紋",
+            "storage_json_not_found": "未找到 storage.json，請確認 Antigravity 已運行過並生成配置文件"
         },
         "warmup_all": "一鍵預熱",
         "warmup_selected": "預熱 ({{count}})",
@@ -532,7 +535,12 @@
                 "max_wait": "最大等待時長 (秒)",
                 "max_wait_tooltip": "僅在“快取優先”模式下生效：如果帳號限流重置時間小於此值，則原地等待而非切換帳號。",
                 "clear_bindings": "清除會話繫結",
-                "clear_bindings_tooltip": "立即斷開所有會話與帳號的繫結關係，強制下一次請求重新分配帳號。"
+                "clear_bindings_tooltip": "立即斷開所有會話與帳號的繫結關係，強制下一次請求重新分配帳號。",
+                "fixed_account": "固定帳戶模式",
+                "fixed_account_tooltip": "啟用後，所有 API 請求將只使用所選帳戶，而不會在帳戶之間輪換。",
+                "round_robin_set": "輪詢模式已啟用",
+                "fixed_account_set": "固定帳戶模式已啟用",
+                "account_changed": "帳戶已變更為：{{email}}"
             },
             "experimental": {
                 "title": "實驗性設定 (Experimental)",
@@ -801,5 +809,24 @@
             "stream_error": "資料流傳輸錯誤,請稍後重試",
             "unknown_error": "發生未知錯誤,請稍後重試"
         }
+    },
+    "token_stats": {
+        "title": "Token 消費統計",
+        "hourly": "小時",
+        "daily": "日",
+        "weekly": "週",
+        "total_tokens": "總 Token",
+        "input_tokens": "輸入 Token",
+        "output_tokens": "輸出 Token",
+        "accounts_used": "活躍帳號",
+        "usage_trend": "Token 使用趨勢",
+        "input": "輸入",
+        "output": "輸出",
+        "no_data": "暫無數據",
+        "by_account": "分帳號統計",
+        "account_details": "帳號詳細統計",
+        "account": "帳號",
+        "requests": "請求數",
+        "total": "合計"
     }
 }

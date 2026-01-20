@@ -164,6 +164,10 @@ export default function ApiProxy() {
     const [isRegenerateKeyConfirmOpen, setIsRegenerateKeyConfirmOpen] = useState(false);
     const [isClearBindingsConfirmOpen, setIsClearBindingsConfirmOpen] = useState(false);
 
+    // [FIX #820] Fixed account mode states
+    const [preferredAccountId, setPreferredAccountId] = useState<string | null>(null);
+    const [availableAccounts, setAvailableAccounts] = useState<Array<{ id: string; email: string }>>([]);
+
     const zaiModelOptions = useMemo(() => {
         const unique = new Set(zaiAvailableModels);
         return Array.from(unique).sort();
@@ -187,9 +191,60 @@ export default function ApiProxy() {
     useEffect(() => {
         loadConfig();
         loadStatus();
+        loadAccounts();
+        loadPreferredAccount();
         const interval = setInterval(loadStatus, 3000);
         return () => clearInterval(interval);
     }, []);
+
+    // [FIX #820] Load available accounts for fixed account mode
+    const loadAccounts = async () => {
+        try {
+            const accounts = await invoke<Array<{ id: string; email: string }>>('list_accounts');
+            setAvailableAccounts(accounts.map(a => ({ id: a.id, email: a.email })));
+        } catch (error) {
+            console.error('Failed to load accounts:', error);
+        }
+    };
+
+    // [FIX #820] Load current preferred account
+    const loadPreferredAccount = async () => {
+        try {
+            const prefId = await invoke<string | null>('get_preferred_account');
+            setPreferredAccountId(prefId);
+        } catch (error) {
+            // Service not running, ignore
+        }
+    };
+
+    // [FIX #820] Set preferred account
+    const handleSetPreferredAccount = async (accountId: string | null) => {
+        try {
+            const wasEnabled = preferredAccountId !== null;
+            await invoke('set_preferred_account', { accountId });
+            setPreferredAccountId(accountId);
+
+            // Determine appropriate message
+            let message: string;
+            if (accountId === null) {
+                message = t('proxy.config.scheduling.round_robin_set', { defaultValue: 'Round-robin mode enabled' });
+            } else if (wasEnabled) {
+                // Changed account while already in fixed mode
+                const account = availableAccounts.find(a => a.id === accountId);
+                message = t('proxy.config.scheduling.account_changed', {
+                    defaultValue: `Switched to ${account?.email || accountId}`,
+                    email: account?.email || accountId
+                });
+            } else {
+                // Just enabled fixed mode
+                message = t('proxy.config.scheduling.fixed_account_set', { defaultValue: 'Fixed account mode enabled' });
+            }
+
+            showToast(message, 'success');
+        } catch (error) {
+            showToast(String(error), 'error');
+        }
+    };
 
     const loadConfig = async () => {
         setConfigLoading(true);
@@ -1288,6 +1343,52 @@ print(response.text)`;
                                                 <p className="text-[10px] text-amber-700 dark:text-amber-500 leading-relaxed">
                                                     <strong>{t('common.info')}:</strong> {t('proxy.config.scheduling.subtitle')}
                                                 </p>
+                                            </div>
+
+                                            {/* [FIX #820] Fixed Account Mode */}
+                                            <div className="bg-indigo-50 dark:bg-indigo-900/20 rounded-xl p-4 border border-indigo-200 dark:border-indigo-800">
+                                                <div className="flex items-center justify-between mb-3">
+                                                    <label className="text-xs font-medium text-gray-700 dark:text-gray-300 inline-flex items-center gap-1">
+                                                        🔒 {t('proxy.config.scheduling.fixed_account', { defaultValue: 'Fixed Account Mode' })}
+                                                        <HelpTooltip text={t('proxy.config.scheduling.fixed_account_tooltip', { defaultValue: 'When enabled, all API requests will use only the selected account instead of rotating between accounts.' })} />
+                                                    </label>
+                                                    <input
+                                                        type="checkbox"
+                                                        className="toggle toggle-sm toggle-primary"
+                                                        checked={preferredAccountId !== null}
+                                                        onChange={(e) => {
+                                                            if (e.target.checked) {
+                                                                // Enable fixed mode with first available account
+                                                                if (availableAccounts.length > 0) {
+                                                                    handleSetPreferredAccount(availableAccounts[0].id);
+                                                                }
+                                                            } else {
+                                                                // Disable fixed mode
+                                                                handleSetPreferredAccount(null);
+                                                            }
+                                                        }}
+                                                        disabled={!status.running}
+                                                    />
+                                                </div>
+                                                {preferredAccountId !== null && (
+                                                    <select
+                                                        className="select select-bordered select-sm w-full text-xs"
+                                                        value={preferredAccountId || ''}
+                                                        onChange={(e) => handleSetPreferredAccount(e.target.value || null)}
+                                                        disabled={!status.running}
+                                                    >
+                                                        {availableAccounts.map(account => (
+                                                            <option key={account.id} value={account.id}>
+                                                                {account.email}
+                                                            </option>
+                                                        ))}
+                                                    </select>
+                                                )}
+                                                {!status.running && (
+                                                    <p className="text-[10px] text-gray-500 mt-2">
+                                                        {t('proxy.config.scheduling.start_proxy_first', { defaultValue: 'Start the proxy service to configure fixed account mode.' })}
+                                                    </p>
+                                                )}
                                             </div>
                                         </div>
                                     </div>

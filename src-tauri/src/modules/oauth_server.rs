@@ -23,9 +23,9 @@ fn oauth_success_html() -> &'static str {
     "HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\n\r\n\
     <html>\
     <body style='font-family: sans-serif; text-align: center; padding: 50px;'>\
-        <h1 style='color: green;'>✅ 授权成功!</h1>\
-        <p>您可以关闭此窗口返回应用。</p>\
-        <script>setTimeout(function() { window.close(); }, 2000);</script>\
+    <h1 style='color: green;'>✅ Authorization Successful!</h1>\
+    <p>You can close this window and return to the application.</p>\
+    <script>setTimeout(function() { window.close(); }, 2000);</script>\
     </body>\
     </html>"
 }
@@ -34,8 +34,8 @@ fn oauth_fail_html() -> &'static str {
     "HTTP/1.1 400 Bad Request\r\nContent-Type: text/html; charset=utf-8\r\n\r\n\
     <html>\
     <body style='font-family: sans-serif; text-align: center; padding: 50px;'>\
-        <h1 style='color: red;'>❌ 授权失败</h1>\
-        <p>未能获取授权 Code，请返回应用重试。</p>\
+    <h1 style='color: red;'>❌ Authorization Failed</h1>\
+    <p>Failed to obtain Authorization Code. Please return to the app and try again.</p>\
     </body>\
     </html>"
 }
@@ -43,7 +43,7 @@ fn oauth_fail_html() -> &'static str {
 async fn ensure_oauth_flow_prepared(app_handle: &tauri::AppHandle) -> Result<String, String> {
     use tauri::Emitter;
 
-    // 如果已有 flow，直接返回 URL
+    // Return URL if flow already exists
     if let Ok(state) = get_oauth_flow_state().lock() {
         if let Some(s) = state.as_ref() {
             return Ok(s.auth_url.clone());
@@ -64,7 +64,7 @@ async fn ensure_oauth_flow_prepared(app_handle: &tauri::AppHandle) -> Result<Str
         Ok(l6) => {
             port = l6
                 .local_addr()
-                .map_err(|e| format!("无法获取本地端口: {}", e))?
+                .map_err(|e| format!("failed_to_get_local_port: {}", e))?
                 .port();
             ipv6_listener = Some(l6);
 
@@ -72,7 +72,7 @@ async fn ensure_oauth_flow_prepared(app_handle: &tauri::AppHandle) -> Result<Str
                 Ok(l4) => ipv4_listener = Some(l4),
                 Err(e) => {
                     crate::modules::logger::log_warn(&format!(
-                        "无法绑定 IPv4 回调端口 127.0.0.1:{} (将仅监听 IPv6): {}",
+                        "failed_to_bind_ipv4_callback_port_127_0_0_1:{} (will only listen on IPv6): {}",
                         port, e
                     ));
                 }
@@ -81,10 +81,10 @@ async fn ensure_oauth_flow_prepared(app_handle: &tauri::AppHandle) -> Result<Str
         Err(_) => {
             let l4 = TcpListener::bind("127.0.0.1:0")
                 .await
-                .map_err(|e| format!("无法绑定本地端口: {}", e))?;
+                .map_err(|e| format!("failed_to_bind_local_port: {}", e))?;
             port = l4
                 .local_addr()
-                .map_err(|e| format!("无法获取本地端口: {}", e))?
+                .map_err(|e| format!("failed_to_get_local_port: {}", e))?
                 .port();
             ipv4_listener = Some(l4);
 
@@ -92,7 +92,7 @@ async fn ensure_oauth_flow_prepared(app_handle: &tauri::AppHandle) -> Result<Str
                 Ok(l6) => ipv6_listener = Some(l6),
                 Err(e) => {
                     crate::modules::logger::log_warn(&format!(
-                        "无法绑定 IPv6 回调端口 [::1]:{} (将仅监听 IPv4): {}",
+                        "failed_to_bind_ipv6_callback_port_::1:{} (will only listen on IPv4): {}",
                         port, e
                     ));
                 }
@@ -113,7 +113,7 @@ async fn ensure_oauth_flow_prepared(app_handle: &tauri::AppHandle) -> Result<Str
 
     let auth_url = oauth::get_auth_url(&redirect_uri);
 
-    // 取消信号（支持多消费者）
+    // Cancellation signal (supports multiple consumers)
     let (cancel_tx, cancel_rx) = watch::channel(false);
     let (code_tx, code_rx) = oneshot::channel::<Result<String, String>>();
 
@@ -129,7 +129,7 @@ async fn ensure_oauth_flow_prepared(app_handle: &tauri::AppHandle) -> Result<Str
         let app_handle = app_handle_for_tasks.clone();
         tokio::spawn(async move {
             if let Ok((mut stream, _)) = tokio::select! {
-                res = l4.accept() => res.map_err(|e| format!("接受连接失败: {}", e)),
+                res = l4.accept() => res.map_err(|e| format!("failed_to_accept_connection: {}", e)),
                 _ = rx.changed() => Err("OAuth cancelled".to_string()),
             } {
                 // Reuse the existing parsing/response code by constructing a temporary listener task
@@ -150,7 +150,7 @@ async fn ensure_oauth_flow_prepared(app_handle: &tauri::AppHandle) -> Result<Str
 
                 let (result, response_html) = match code {
                     Some(code) => (Ok(code), oauth_success_html()),
-                    None => (Err("未能在回调中获取 Authorization Code".to_string()), oauth_fail_html()),
+                    None => (Err("Failed to get Authorization Code in callback".to_string()), oauth_fail_html()),
                 };
                 let _ = stream.write_all(response_html.as_bytes()).await;
                 let _ = stream.flush().await;
@@ -169,7 +169,7 @@ async fn ensure_oauth_flow_prepared(app_handle: &tauri::AppHandle) -> Result<Str
         let app_handle = app_handle_for_tasks;
         tokio::spawn(async move {
             if let Ok((mut stream, _)) = tokio::select! {
-                res = l6.accept() => res.map_err(|e| format!("接受连接失败: {}", e)),
+                res = l6.accept() => res.map_err(|e| format!("failed_to_accept_connection: {}", e)),
                 _ = rx.changed() => Err("OAuth cancelled".to_string()),
             } {
                 let mut buffer = [0u8; 4096];
@@ -188,7 +188,7 @@ async fn ensure_oauth_flow_prepared(app_handle: &tauri::AppHandle) -> Result<Str
 
                 let (result, response_html) = match code {
                     Some(code) => (Ok(code), oauth_success_html()),
-                    None => (Err("未能在回调中获取 Authorization Code".to_string()), oauth_fail_html()),
+                    None => (Err("Failed to get Authorization Code in callback".to_string()), oauth_fail_html()),
                 };
                 let _ = stream.write_all(response_html.as_bytes()).await;
                 let _ = stream.flush().await;
@@ -201,7 +201,7 @@ async fn ensure_oauth_flow_prepared(app_handle: &tauri::AppHandle) -> Result<Str
         });
     }
 
-    // 保存状态
+    // Save state
     if let Ok(mut state) = get_oauth_flow_state().lock() {
         *state = Some(OAuthFlowState {
             auth_url: auth_url.clone(),
@@ -211,62 +211,62 @@ async fn ensure_oauth_flow_prepared(app_handle: &tauri::AppHandle) -> Result<Str
         });
     }
 
-    // 发送事件给前端（用于展示/复制链接）
+    // Send event to frontend (for display/copying link)
     let _ = app_handle.emit("oauth-url-generated", &auth_url);
 
     Ok(auth_url)
 }
 
-/// 预生成 OAuth URL (不打开浏览器、不阻塞等待回调)
+/// Pre-generate OAuth URL (does not open browser, does not block waiting for callback)
 pub async fn prepare_oauth_url(app_handle: tauri::AppHandle) -> Result<String, String> {
     ensure_oauth_flow_prepared(&app_handle).await
 }
 
-/// 取消当前的 OAuth 流程
+/// Cancel current OAuth flow
 pub fn cancel_oauth_flow() {
     if let Ok(mut state) = get_oauth_flow_state().lock() {
         if let Some(s) = state.take() {
             let _ = s.cancel_tx.send(true);
-            crate::modules::logger::log_info("已发送 OAuth 取消信号");
+            crate::modules::logger::log_info("Sent OAuth cancellation signal");
         }
     }
 }
 
-/// 启动 OAuth 流程并等待回调，再交换 token
+/// Start OAuth flow and wait for callback, then exchange token
 pub async fn start_oauth_flow(app_handle: tauri::AppHandle) -> Result<oauth::TokenResponse, String> {
-    // 确保已准备好 URL + listener（这样即使用户先授权，也不会卡住）
+    // Ensure URL + listener are ready (this way if the user authorizes first, it won't get stuck)
     let auth_url = ensure_oauth_flow_prepared(&app_handle).await?;
 
-    // 打开默认浏览器
+    // Open default browser
     use tauri_plugin_opener::OpenerExt;
     app_handle
         .opener()
         .open_url(&auth_url, None::<String>)
-        .map_err(|e| format!("无法打开浏览器: {}", e))?;
+        .map_err(|e| format!("failed_to_open_browser: {}", e))?;
 
-    // 取出 code_rx 用于等待
+    // Take code_rx to wait for it
     let (code_rx, redirect_uri) = {
         let mut lock = get_oauth_flow_state()
             .lock()
-            .map_err(|_| "OAuth 状态锁被污染".to_string())?;
+            .map_err(|_| "OAuth state lock corrupted".to_string())?;
         let Some(state) = lock.as_mut() else {
-            return Err("OAuth 状态不存在".to_string());
+            return Err("OAuth state does not exist".to_string());
         };
         let rx = state
             .code_rx
             .take()
-            .ok_or_else(|| "OAuth 授权已在进行中".to_string())?;
+            .ok_or_else(|| "OAuth authorization already in progress".to_string())?;
         (rx, state.redirect_uri.clone())
     };
 
-    // 等待 code（如果用户已完成授权，此处会立即返回）
+    // Wait for code (if user has already authorized, this returns immediately)
     let code = match code_rx.await {
         Ok(Ok(code)) => code,
         Ok(Err(e)) => return Err(e),
-        Err(_) => return Err("等待 OAuth 回调失败".to_string()),
+        Err(_) => return Err("Failed to wait for OAuth callback".to_string()),
     };
 
-    // 清理 flow state（释放 cancel_tx 等）
+    // Clean up flow state (release cancel_tx, etc.)
     if let Ok(mut lock) = get_oauth_flow_state().lock() {
         *lock = None;
     }
@@ -285,21 +285,21 @@ pub async fn complete_oauth_flow(app_handle: tauri::AppHandle) -> Result<oauth::
     let (code_rx, redirect_uri) = {
         let mut lock = get_oauth_flow_state()
             .lock()
-            .map_err(|_| "OAuth 状态锁被污染".to_string())?;
+            .map_err(|_| "OAuth state lock corrupted".to_string())?;
         let Some(state) = lock.as_mut() else {
-            return Err("OAuth 状态不存在".to_string());
+            return Err("OAuth state does not exist".to_string());
         };
         let rx = state
             .code_rx
             .take()
-            .ok_or_else(|| "OAuth 授权已在进行中".to_string())?;
+            .ok_or_else(|| "OAuth authorization already in progress".to_string())?;
         (rx, state.redirect_uri.clone())
     };
 
     let code = match code_rx.await {
         Ok(Ok(code)) => code,
         Ok(Err(e)) => return Err(e),
-        Err(_) => return Err("等待 OAuth 回调失败".to_string()),
+        Err(_) => return Err("Failed to wait for OAuth callback".to_string()),
     };
 
     if let Ok(mut lock) = get_oauth_flow_state().lock() {

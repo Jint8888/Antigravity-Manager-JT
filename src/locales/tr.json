@@ -1,5 +1,6 @@
 {
     "common": {
+        "empty": "Boş",
         "loading": "Yükleniyor...",
         "add": "Ekle",
         "copy": "Kopyala",
@@ -37,6 +38,7 @@
         "dashboard": "Kontrol Paneli",
         "accounts": "Hesaplar",
         "proxy": "API Proxy",
+        "token_stats": "İstatistikler",
         "call_records": "Trafik Günlükleri",
         "settings": "Ayarlar",
         "theme_to_dark": "Karanlık Moda Geç",
@@ -159,7 +161,8 @@
             "restored": "Geri yüklendi",
             "deleted": "Silindi",
             "directory_opened": "Depolama dizini açıldı",
-            "original_fingerprint_not_found": "Orijinal parmak izi bulunamadı"
+            "original_fingerprint_not_found": "Orijinal parmak izi bulunamadı",
+            "storage_json_not_found": "storage.json bulunamadı, lütfen Antigravity'nin yapılandırma dosyasını oluşturmak için çalıştırıldığından emin olun"
         },
         "quota_protected": "Korumalı",
         "details": {
@@ -499,7 +502,12 @@
                 "max_wait": "Maks Bekleme (sn)",
                 "max_wait_tooltip": "Yalnızca 'Önbellek Öncelikli' modunda kullanılır: oran limiti sıfırlama zamanı bu değerin altındaysa geçiş yapmak yerine bekle.",
                 "clear_bindings": "Oturum Bağlantılarını Temizle",
-                "clear_bindings_tooltip": "Tüm oturum ve hesap bağlantılarını hemen kesin, bir sonraki istekte hesapları yeniden atanmaya zorlayın."
+                "clear_bindings_tooltip": "Tüm oturum ve hesap bağlantılarını hemen kesin, bir sonraki istekte hesapları yeniden atanmaya zorlayın.",
+                "fixed_account": "Sabit Hesap Modu",
+                "fixed_account_tooltip": "Etkinleştirildiğinde, tüm API istekleri hesaplar arasında geçiş yapmak yerine yalnızca seçilen hesabı kullanacaktır.",
+                "round_robin_set": "Round-robin modu etkinleştirildi",
+                "fixed_account_set": "Sabit hesap modu etkinleştirildi",
+                "account_changed": "Hesap şuna değiştirildi: {{email}}"
             },
             "experimental": {
                 "title": "Deneysel Ayarlar",
@@ -717,6 +725,8 @@
             "request_payload": "İstek Yükü",
             "response_payload": "Yanıt Yükü",
             "duration": "Süre",
+            "token_stats": "Token Stats",
+            "settings": "Settings",
             "tokens": "Token'lar (G/Ç)",
             "time": "Zaman",
             "model": "Model",
@@ -768,5 +778,24 @@
             "stream_error": "Akış iletim hatası, lütfen daha sonra tekrar deneyin",
             "unknown_error": "Bilinmeyen bir hata oluştu, lütfen daha sonra tekrar deneyin"
         }
+    },
+    "token_stats": {
+        "title": "Token İstatistikleri",
+        "hourly": "Saatlik",
+        "daily": "Günlük",
+        "weekly": "Haftalık",
+        "total_tokens": "Toplam Token",
+        "input_tokens": "Giriş Tokenleri",
+        "output_tokens": "Çıkış Tokenleri",
+        "accounts_used": "Aktif Hesaplar",
+        "usage_trend": "Kullanım Trendi",
+        "input": "Giriş",
+        "output": "Çıkış",
+        "no_data": "Veri Yok",
+        "by_account": "Hesap İstatistikleri",
+        "account_details": "Hesap Detayları",
+        "account": "Hesap",
+        "requests": "İstekler",
+        "total": "Toplam"
     }
 }

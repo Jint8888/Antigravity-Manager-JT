@@ -1605,7 +1605,8 @@ fn build_generation_config(
     }*/
 
     // max_tokens 映射为 maxOutputTokens
-    let mut final_max_tokens = 16384;
+    // Respect client-provided max_tokens (aligns with OpenAI mapper behavior)
+    let mut final_max_tokens: i64 = claude_req.max_tokens.map(|t| t as i64).unwrap_or(16384);
     
     // [NEW] 确保 maxOutputTokens 大于 thinkingBudget (API 强约束)
     if let Some(thinking_config) = config.get("thinkingConfig") {

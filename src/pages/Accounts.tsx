@@ -129,7 +129,17 @@ function Accounts() {
 
     // Pagination State
     const [currentPage, setCurrentPage] = useState(1);
-    const [localPageSize, setLocalPageSize] = useState<number | null>(null); // 本地分页大小状态
+    const [localPageSize, setLocalPageSize] = useState<number | null>(() => {
+        const saved = localStorage.getItem('accounts_page_size');
+        return saved ? parseInt(saved) : null;
+    }); // 本地分页大小状态
+
+    // Save page size preference
+    useEffect(() => {
+        if (localPageSize !== null) {
+            localStorage.setItem('accounts_page_size', localPageSize.toString());
+        }
+    }, [localPageSize]);
 
     // 动态计算分页条数
     const ITEMS_PER_PAGE = useMemo(() => {
@@ -148,11 +158,12 @@ function Accounts() {
 
         if (viewMode === 'list') {
             const headerHeight = 36; // 缩深后的表头高度
-            const rowHeight = 42;    // 极限压缩后的行高
-            // 计算能容纳多少行,至少 1 行
-            return Math.max(1, Math.floor((containerSize.height - headerHeight) / rowHeight));
+            const rowHeight = 72;    // 包含多行模型信息后的实际行高
+            // 计算能容纳多少行, 默认最低 10 行
+            const autoFitCount = Math.floor((containerSize.height - headerHeight) / rowHeight);
+            return Math.max(10, autoFitCount);
         } else {
-            const cardHeight = 158; // AccountCard 预估高度 (含间距)
+            const cardHeight = 180; // AccountCard 实际高度 (含间距)
             const gap = 16;         // gap-4
 
             // 匹配 Tailwind 断点逻辑

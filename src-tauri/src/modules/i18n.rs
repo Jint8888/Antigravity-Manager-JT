@@ -1,7 +1,7 @@
 use serde_json::Value;
 use std::collections::HashMap;
 
-/// 托盘文本结构
+/// Tray text structure
 #[derive(Debug, Clone)]
 pub struct TrayTexts {
     pub current: String,
@@ -15,7 +15,7 @@ pub struct TrayTexts {
     pub forbidden: String,
 }
 
-/// 从 JSON 加载翻译
+/// Load translations from JSON
 fn load_translations(lang: &str) -> HashMap<String, String> {
     let json_content = match lang {
         "en" | "en-US" => include_str!("../../../src/locales/en.json"),
@@ -38,7 +38,7 @@ fn load_translations(lang: &str) -> HashMap<String, String> {
     map
 }
 
-/// 获取托盘文本（根据语言）
+/// Get tray texts (based on language)
 pub fn get_tray_texts(lang: &str) -> TrayTexts {
     let t = load_translations(lang);
     
