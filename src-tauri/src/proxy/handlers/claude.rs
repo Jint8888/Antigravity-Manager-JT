@@ -582,7 +582,6 @@ pub async fn handle_messages(
             }
         }
 
-<<<<<<< HEAD
         // ===== [3-Layer Progressive Compression + Calibrated Estimation] Context Management =====
         // [ENHANCED] 整合 3.3.47 的三层压缩框架 + PR #925 的动态校准机制
         // Layer 1 (60%): Tool message trimming - Does NOT break cache

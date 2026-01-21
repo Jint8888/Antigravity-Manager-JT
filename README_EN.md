@@ -368,6 +368,18 @@ print(response.choices[0].message.content)
             -   **Protocol Completion**: Enhanced OpenAI Legacy endpoints with Token usage statistics and Header injection. Added support for `input_text` content blocks and mapped the `developer` role to system instructions.
             -   **requestId Unification**: Unified `requestId` prefix to `agent-` across all OpenAI paths to resolve ID recognition issues with some clients. interface response bodies, resolving the issue where token consumption was not displayed in traffic logs.
         -   **[Core Fix] JSON Schema Array Recursive Cleaning Fix (Resolution of Gemini API 400 Errors)**:
+            -   **Issue**: Complex nested array schemas in tool definitions (like `apply_patch` or `local_shell_call`) were not being recursively cleaned, leading to 400 errors from Gemini API due to unsupported fields like `const` or `propertyNames`.
+            -   **Fix**: Implemented full recursive cleaning for all `Value::Array` types in the JSON Schema processor.
+            -   **Impact**: Significantly improves compatibility with tools that use complex array schemas.
+    *   **v3.3.47 (2026-01-21)**:
+        -   **[Feature] Cloudflared Tunnel Support (PR #923)**:
+            -   **Core Function**: Integrated `cloudflared` tunnel support, allowing users without public IPs or in complex network environments to publish API services via Cloudflare tunnels.
+            -   **UX Optimization**: Added a dedicated Cloudflared configuration UI for status monitoring, log viewing, and one-click tunnel control.
+            -   **i18n Completion**: Added translations for Cloudflared features in 8 languages (English, Chinese, Japanese, Korean, Vietnamese, Turkish, Russian, etc.).
+        -   **[Core Fix] Resolve Startup Failure Due to Git Merge Conflict**:
+            -   **Fix**: Removed `<<<<<<< HEAD` conflict markers in `src-tauri/src/proxy/handlers/claude.rs` caused by parallel PR merges.
+            -   **Impact**: Restored backend compilation and resolved the "crash on startup" issue.
+        -   **[Core Optimization] 3-Layer Progressive Context Compression (3-Layer Progressive Context PCC)**:
             -   **Background**: Gemini API does not support JSON Schema fields like `propertyNames` and `const`. Although whitelist filtering logic was in place, the `clean_json_schema_recursive` function lacked recursive handling for `Value::Array` types, causing illegal fields nested within `anyOf`, `oneOf`, or `items` arrays to escape cleaning, triggering `Invalid JSON payload received. Unknown name "propertyNames"/"const"` errors.
             -   **Fix Details**:
                 - **Added Recursive Cleaning Before anyOf/oneOf Merging**: Recursively cleans each branch's content before merging `anyOf`/`oneOf` branches, ensuring merged branches are already cleaned and preventing illegal fields from escaping during the merge process.

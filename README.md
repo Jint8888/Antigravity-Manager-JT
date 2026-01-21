@@ -361,7 +361,15 @@ response = client.chat.completions.create(
                 - ✅ 参数优先级：请求体参数 > 模型后缀
                 - ✅ 无破坏性变更：Images API 继续正常工作
             -   **影响**: 所有协议（OpenAI、Claude）现在都能通过参数精确控制图片生成获得改进
-        -   **[核心优化] 三层渐进式上下文压缩 (3-Layer Progressive Context Compression)**:
+    *   **v3.3.47 (2026-01-21)**:
+        -   **[功能增强] Cloudflared 内网穿透支持 (PR #923)**:
+            -   **核心功能**: 集成 `cloudflared` 隧道支持，允许用户在无公网 IP 或处于复杂内网环境下，通过 Cloudflare 隧道一键发布 API 服务。
+            -   **易用性优化**: 前端新增 Cloudflared 配置界面，支持状态监控、日志查看及一键开关隧道。
+            -   **国际化补全**: 补全了繁体中文、英文、日文、韩文、越南语、土耳其语、俄语等 8 国语言的 Cloudflared 相关翻译。
+        -   **[核心修复] 解决 Git 合并冲突导致的启动失败**:
+            -   **修复内容**: 解决了 `src-tauri/src/proxy/handlers/claude.rs` 中因多进程并行合并产生的 `<<<<<<< HEAD` 冲突标记。
+            -   **影响范围**: 恢复了后端服务的编译能力，修复了应用启动即崩溃的问题。
+        -   **[核心优化] 三层渐进式上下文压缩 (3-Layer Progressive Context PCC)**:
             -   **背景**: 长对话场景下频繁触发 "Prompt is too long" 错误，手动 `/compact` 操作繁琐，且现有压缩策略会破坏 LLM 的 KV Cache，导致成本飙升
             -   **解决方案 - 多层渐进式压缩策略**:
                 - **Layer 1 (60% 压力)**: 工具消息智能裁剪
