@@ -874,6 +874,7 @@ pub async fn handle_messages(
                                 .header(header::CONTENT_TYPE, "text/event-stream")
                                 .header(header::CACHE_CONTROL, "no-cache")
                                 .header(header::CONNECTION, "keep-alive")
+                                .header("X-Accel-Buffering", "no")
                                 .header("X-Account-Email", &email)
                                 .header("X-Mapped-Model", &request_with_mapped.model)
                                 .header("X-Context-Purified", if is_purified { "true" } else { "false" })
@@ -999,8 +1000,7 @@ pub async fn handle_messages(
                 || error_text.contains("must be 'thinking'")
                 )
         {
-            // Existing logic for thinking signature...
-            retried_without_thinking = true;
+            // Existing logic for thinking signature...\n            retried_without_thinking = true;
             
             // 使用 WARN 级别,因为这不应该经常发生(已经主动过滤过)
             tracing::warn!(
@@ -1008,6 +1008,25 @@ pub async fn handle_messages(
                  Retrying with all thinking blocks removed.",
                 trace_id
             );
+
+            // [NEW] 追加修复提示词到最后一条用户消息
+            if let Some(last_msg) = request_for_body.messages.last_mut() {
+                if last_msg.role == "user" {
+                    let repair_prompt = "\n\n[System Recovery] Your previous output contained an invalid signature. Please regenerate the response without the corrupted signature block.";
+                    
+                    match &mut last_msg.content {
+                        crate::proxy::mappers::claude::models::MessageContent::String(s) => {
+                            s.push_str(repair_prompt);
+                        }
+                        crate::proxy::mappers::claude::models::MessageContent::Array(blocks) => {
+                            blocks.push(crate::proxy::mappers::claude::models::ContentBlock::Text {
+                                text: repair_prompt.to_string(),
+                            });
+                        }
+                    }
+                    tracing::debug!("[{}] Appended repair prompt to last user message", trace_id);
+                }
+            }
 
             // [IMPROVED] 不再禁用 Thinking 模式！
             // 既然我们已经将历史 Thinking Block 转换为 Text，那么当前请求可以视为一个新的 Thinking 会话

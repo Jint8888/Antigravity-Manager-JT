@@ -14,7 +14,7 @@ const MAX_RETRY_ATTEMPTS: usize = 3;
 pub async fn handle_generate(
     State(state): State<AppState>,
     Path(model_action): Path<String>,
-    Json(body): Json<Value>
+    Json(mut body): Json<Value>  // 改为 mut 以支持修复提示词注入
 ) -> Result<impl IntoResponse, (StatusCode, String)> {
     // 解析 model:method
     let (model_name, method) = if let Some((m, action)) = model_action.rsplit_once(':') {
@@ -237,6 +237,7 @@ pub async fn handle_generate(
                     .header("Content-Type", "text/event-stream")
                     .header("Cache-Control", "no-cache")
                     .header("Connection", "keep-alive")
+                    .header("X-Accel-Buffering", "no")
                     .header("X-Account-Email", &email)
                     .header("X-Mapped-Model", &mapped_model)
                     .body(body)
@@ -294,6 +295,33 @@ pub async fn handle_generate(
 
             tracing::warn!("Gemini Upstream {} on account {} attempt {}/{}, rotating account", status_code, email, attempt + 1, max_attempts);
             continue;
+        }
+
+        // [NEW] 处理 400 错误 (Thinking 签名失效)
+        if status_code == 400 
+            && (error_text.contains("Invalid `signature`")
+                || error_text.contains("thinking.signature")
+                || error_text.contains("Invalid signature")
+                || error_text.contains("Corrupted thought signature"))
+        {
+            tracing::warn!(
+                "[Gemini] Signature error detected on account {}, retrying without thinking",
+                email
+            );
+            
+            // 追加修复提示词到请求体的最后一条内容
+            if let Some(contents) = body.get_mut("contents").and_then(|v| v.as_array_mut()) {
+                if let Some(last_content) = contents.last_mut() {
+                    if let Some(parts) = last_content.get_mut("parts").and_then(|v| v.as_array_mut()) {
+                        parts.push(json!({
+                            "text": "\n\n[System Recovery] Your previous output contained an invalid signature. Please regenerate the response without the corrupted signature block."
+                        }));
+                        tracing::debug!("[Gemini] Appended repair prompt to last content");
+                    }
+                }
+            }
+            
+            continue; // 重试
         }
  
         // 404 等由于模型配置或路径错误的 HTTP 异常，直接报错，不进行无效轮换

@@ -311,6 +311,7 @@ pub async fn handle_chat_completions(
                         .header("Content-Type", "text/event-stream")
                         .header("Cache-Control", "no-cache")
                         .header("Connection", "keep-alive")
+                        .header("X-Accel-Buffering", "no")
                         .header("X-Account-Email", &email)
                         .header("X-Mapped-Model", &mapped_model)
                         .body(body)
@@ -385,6 +386,43 @@ pub async fn handle_chat_completions(
                 max_attempts
             );
             continue;
+        }
+
+        // [NEW] 处理 400 错误 (Thinking 签名失效)
+        if status_code == 400 
+            && (error_text.contains("Invalid `signature`")
+                || error_text.contains("thinking.signature")
+                || error_text.contains("Invalid signature")
+                || error_text.contains("Corrupted thought signature"))
+        {
+            tracing::warn!(
+                "[OpenAI] Signature error detected on account {}, retrying without thinking",
+                email
+            );
+            
+            // 追加修复提示词到最后一条用户消息
+            if let Some(last_msg) = openai_req.messages.last_mut() {
+                if last_msg.role == "user" {
+                    let repair_prompt = "\n\n[System Recovery] Your previous output contained an invalid signature. Please regenerate the response without the corrupted signature block.";
+                    
+                    if let Some(content) = &mut last_msg.content {
+                        use crate::proxy::mappers::openai::{OpenAIContent, OpenAIContentBlock};
+                        match content {
+                            OpenAIContent::String(s) => {
+                                s.push_str(repair_prompt);
+                            }
+                            OpenAIContent::Array(arr) => {
+                                arr.push(OpenAIContentBlock::Text {
+                                    text: repair_prompt.to_string()
+                                });
+                            }
+                        }
+                        tracing::debug!("[OpenAI] Appended repair prompt to last user message");
+                    }
+                }
+            }
+            
+            continue; // 重试
         }
 
         // 只有 403 (权限/地区限制) 和 401 (认证失效) 触发账号轮换

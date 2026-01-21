@@ -291,6 +291,34 @@ print(response.choices[0].message.content)
                 - ✅ Backward Compatible: Existing configurations unaffected; new users or config resets will automatically include the image model
                 - ✅ Complete Protection: All 4 core models (Gemini 3 Flash, Gemini 3 Pro High, Claude 4.5 Sonnet, Gemini 3 Pro Image) are now monitored by quota protection
                 - ✅ Auto-trigger: When image model quota falls below threshold, accounts are automatically added to the protection list, preventing further consumption
+        -   **[Transport Layer Optimization] Streaming Response Anti-Buffering**:
+            -   **Background**: When deployed behind reverse proxies like Nginx, streaming responses may be buffered by the proxy, increasing client-side latency
+            -   **Fix Details**:
+                - **Added X-Accel-Buffering Header**: Injected `X-Accel-Buffering: no` header in all streaming responses
+                - **Multi-Protocol Coverage**: Claude (`/v1/messages`), OpenAI (`/v1/chat/completions`), and Gemini native protocol all supported
+            -   **Technical Details**:
+                - Modified files: `claude.rs:L877`, `openai.rs:L314`, `gemini.rs:L240`
+                - This header instructs Nginx and other reverse proxies not to buffer streaming responses, passing them directly to clients
+            -   **Impact**: Significantly reduces streaming response latency in reverse proxy scenarios, improving user experience
+        -   **[Error Recovery Enhancement] Multi-Protocol Signature Error Recovery Prompts**:
+            -   **Background**: When signature errors occur in Thinking mode, merely removing signatures may cause the model to generate empty responses or simple "OK" replies
+            -   **Fix Details**:
+                - **Claude Protocol Enhancement**: Added repair prompts to existing signature error retry logic, guiding the model to regenerate complete responses
+                - **OpenAI Protocol Implementation**: Added 400 signature error detection and repair prompt injection logic
+                - **Gemini Protocol Implementation**: Added 400 signature error detection and repair prompt injection logic
+            -   **Repair Prompt**:
+                ```
+                [System Recovery] Your previous output contained an invalid signature. 
+                Please regenerate the response without the corrupted signature block.
+                ```
+            -   **Technical Details**:
+                - Claude: `claude.rs:L1012-1030` - Enhanced existing logic, supports String and Array message formats
+                - OpenAI: `openai.rs:L391-427` - Complete implementation, uses `OpenAIContentBlock::Text` type
+                - Gemini: `gemini.rs:L17, L299-329` - Modified function signature to support mutable body, injects repair prompts
+            -   **Impact**: 
+                - ✅ Improved error recovery success rate: Model receives clear instructions, avoiding meaningless responses
+                - ✅ Multi-protocol consistency: All 3 protocols have the same error recovery capability
+                - ✅ Better user experience: Reduces conversation interruptions caused by signature errors
     *   **v3.3.46 (2026-01-20)**:
         -   **[Enhancement] Deep Optimization & i18n Standardization for Token Stats (PR #892)**:
             -   **Unified UI/UX**: Implemented custom Tooltip components to unify hover styles across Area, Bar, and Pie charts, enhancing contrast and readability in Dark Mode.

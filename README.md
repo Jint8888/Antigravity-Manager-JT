@@ -425,6 +425,34 @@ response = client.chat.completions.create(
                 - ✅ 向后兼容：已有配置不受影响，新用户或重置配置后会自动包含画图模型
                 - ✅ 完整保护：现在所有4个核心模型（Gemini 3 Flash、Gemini 3 Pro High、Claude 4.5 Sonnet、Gemini 3 Pro Image）都受配额保护监控
                 - ✅ 自动触发：当画图模型配额低于阈值时，账号会自动加入保护列表，避免继续消耗
+        -   **[传输层优化] 流式响应防缓冲优化 (Streaming Response Anti-Buffering)**:
+            -   **背景**: 在 Nginx 等反向代理后部署时，流式响应可能被代理缓冲，导致客户端延迟增加
+            -   **修复内容**:
+                - **添加 X-Accel-Buffering Header**: 在所有流式响应中注入 `X-Accel-Buffering: no` 头部
+                - **多协议覆盖**: Claude (`/v1/messages`)、OpenAI (`/v1/chat/completions`) 和 Gemini 原生协议全部支持
+            -   **技术细节**:
+                - 修改文件: `claude.rs:L877`, `openai.rs:L314`, `gemini.rs:L240`
+                - 该 Header 告诉 Nginx 等反向代理不要缓冲流式响应，直接透传给客户端
+            -   **影响**: 显著降低反向代理场景下的流式响应延迟，提升用户体验
+        -   **[错误恢复增强] 多协议签名错误自愈提示词 (Multi-Protocol Signature Error Recovery)**:
+            -   **背景**: 当 Thinking 模式下出现签名错误时，仅剔除签名可能导致模型生成空响应或简单的 "OK"
+            -   **修复内容**:
+                - **Claude 协议增强**: 在现有签名错误重试逻辑中追加修复提示词，引导模型重新生成完整响应
+                - **OpenAI 协议实现**: 新增 400 签名错误检测和修复提示词注入逻辑
+                - **Gemini 协议实现**: 新增 400 签名错误检测和修复提示词注入逻辑
+            -   **修复提示词**:
+                ```
+                [System Recovery] Your previous output contained an invalid signature. 
+                Please regenerate the response without the corrupted signature block.
+                ```
+            -   **技术细节**:
+                - Claude: `claude.rs:L1012-1030` - 增强现有逻辑，支持 String 和 Array 消息格式
+                - OpenAI: `openai.rs:L391-427` - 完整实现，使用 `OpenAIContentBlock::Text` 类型
+                - Gemini: `gemini.rs:L17, L299-329` - 修改函数签名支持可变 body，注入修复提示词
+            -   **影响**: 
+                - ✅ 提升错误恢复成功率：模型收到明确指令，避免生成无意义响应
+                - ✅ 多协议一致性：所有 3 个协议具有相同的错误恢复能力
+                - ✅ 用户体验改善：减少因签名错误导致的对话中断
     *   **v3.3.46 (2026-01-20)**:
         -   **[功能增强] Token 使用统计 (Token Stats) 深度优化与国际化标准化 (PR #892)**:
             -   **UI/UX 统一**: 实现了自定义 Tooltip 组件，统一了面积图、柱状图和饼图的悬浮提示样式，增强了深色模式下的对比度与可读性。
