@@ -543,7 +543,13 @@
                 "title": "Cài đặt thử nghiệm",
                 "title_tooltip": "Các tính năng mang tính khám phá, có thể được điều chỉnh hoặc loại bỏ trong các phiên bản tương lai.",
                 "enable_usage_scaling": "Bật thu phóng dữ liệu sử dụng",
-                "enable_usage_scaling_tooltip": "Dành cho giao thức tương thích với Claude. Khi tổng đầu vào vượt quá 30k Token, hãy bật tính năng thu phóng linh hoạt để ngăn việc kích hoạt nén phía máy khách thường xuyên trong ngữ cảnh lớn. Lưu ý: Sau khi bật, lượng dữ liệu sử dụng hiển thị trên máy khách sẽ không còn đại diện cho điểm thanh toán thực tế."
+                "enable_usage_scaling_tooltip": "Dành cho giao thức tương thích với Claude. Khi tổng đầu vào vượt quá 30k Token, hãy bật tính năng thu phóng linh hoạt để ngăn việc kích hoạt nén phía máy khách thường xuyên trong ngữ cảnh lớn. Lưu ý: Sau khi bật, lượng dữ liệu sử dụng hiển thị trên máy khách sẽ không còn đại diện cho điểm thanh toán thực tế.",
+                "context_compression_threshold_l1": "Ngưỡng nén L1 (Cắt tỉa công cụ)",
+                "context_compression_threshold_l1_tooltip": "Cắt tỉa lịch sử gọi công cụ cũ để tiết kiệm không gian. Khuyên dùng: 0.4 (40%)",
+                "context_compression_threshold_l2": "Ngưỡng nén L2 (Nén tư duy)",
+                "context_compression_threshold_l2_tooltip": "Nén các khối tư duy sớm trong khi vẫn giữ chữ ký. Khuyên dùng: 0.55 (55%)",
+                "context_compression_threshold_l3": "Ngưỡng nén L3 (Đặt lại tóm tắt)",
+                "context_compression_threshold_l3_tooltip": "Tạo bản tóm tắt trạng thái XML và chuyển sang phiên họp mới. Khuyên dùng: 0.7 (70%)"
             },
             "cloudflared": {
                 "title": "Truy cập Công khai (Cloudflared)",

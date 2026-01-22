@@ -544,7 +544,13 @@
                 "title": "Experimental Settings",
                 "title_tooltip": "Exploratory features that may be adjusted or removed in future versions.",
                 "enable_usage_scaling": "Enable Usage Scaling",
-                "enable_usage_scaling_tooltip": "For Claude protocol. Enables aggressive scaling when total input exceeds 30k tokens to prevent frequent client-side compression. Note: Reported usage will not reflect actual billing after enabling."
+                "enable_usage_scaling_tooltip": "For Claude protocol. Enables aggressive scaling when total input exceeds 30k tokens to prevent frequent client-side compression. Note: Reported usage will not reflect actual billing after enabling.",
+                "context_compression_threshold_l1": "L1 Compression Threshold (Tool Trimming)",
+                "context_compression_threshold_l1_tooltip": "Trims old tool call records to save space. Recommended: 0.4 (40%)",
+                "context_compression_threshold_l2": "L2 Compression Threshold (Thinking Compression)",
+                "context_compression_threshold_l2_tooltip": "Compresses early thinking blocks while preserving signatures. Recommended: 0.55 (55%)",
+                "context_compression_threshold_l3": "L3 Compression Threshold (Summary Pivot)",
+                "context_compression_threshold_l3_tooltip": "Ultimate reset: generates an XML state summary and pivots to a fresh session. Most token-efficient. Recommended: 0.7 (70%)"
             }
         },
         "cloudflared": {

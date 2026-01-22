@@ -122,38 +122,16 @@ pub fn list_accounts() -> Result<Vec<Account>, String> {
     crate::modules::logger::log_info("Listing accounts...");
     let mut index = load_account_index()?;
     let mut accounts = Vec::new();
-    let mut invalid_ids = Vec::new();
     
     for summary in &index.accounts {
         match load_account(&summary.id) {
             Ok(account) => accounts.push(account),
             Err(e) => {
                 crate::modules::logger::log_error(&format!("Failed to load account {}: {}", summary.id, e));
-                // If the error is caused by a missing file, mark as invalid ID
-                if e.contains("Account not found") || e.contains("Os { code: 2,") || e.contains("No such file") {
-                    invalid_ids.push(summary.id.clone());
-                }
+                // [FIX #929] Removed auto-repair logic. 
+                // We no longer silently delete account IDs from the index if the file is missing.
+                // This prevents account loss during version upgrades or temporary FS issues.
             },
-        }
-    }
-    
-    // Auto-repair index: remove invalid account IDs
-    if !invalid_ids.is_empty() {
-        crate::modules::logger::log_warn(&format!("Found {} invalid account indexes, auto-cleaning...", invalid_ids.len()));
-        
-        index.accounts.retain(|s| !invalid_ids.contains(&s.id));
-        
-        // If current account is invalid, reset to first available
-        if let Some(current_id) = &index.current_account_id {
-            if invalid_ids.contains(current_id) {
-                index.current_account_id = index.accounts.first().map(|s| s.id.clone());
-            }
-        }
-        
-        if let Err(e) = save_account_index(&index) {
-            crate::modules::logger::log_error(&format!("Failed to auto-clean index: {}", e));
-        } else {
-            crate::modules::logger::log_info("Account index auto-cleaned");
         }
     }
     

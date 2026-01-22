@@ -544,7 +544,13 @@
                 "title": "实验性设置 (Experimental)",
                 "title_tooltip": "探索性功能，可能在未来版本中调整或移除。",
                 "enable_usage_scaling": "启用用量缩放",
-                "enable_usage_scaling_tooltip": "针对 Claude 兼容协议。当总输入超过 30k Token 时开启激进缩放，防止在大上下文下频繁触发客户端压缩。注意：开启后客户端显示的用量不再代表实际计费点数。"
+                "enable_usage_scaling_tooltip": "针对 Claude 兼容协议。当总输入超过 30k Token 时开启激进缩放，防止在大上下文下频繁触发客户端压缩。注意：开启后客户端显示的用量不再代表实际计费点数。",
+                "context_compression_threshold_l1": "L1 压缩阈值 (工具记录清理)",
+                "context_compression_threshold_l1_tooltip": "清理旧的工具调用记录以节省空间。建议值: 0.4 (40%)",
+                "context_compression_threshold_l2": "L2 压缩阈值 (思维链压缩)",
+                "context_compression_threshold_l2_tooltip": "压缩早期的思维链内容，保留签名。建议值: 0.55 (55%)",
+                "context_compression_threshold_l3": "L3 压缩阈值 (摘要重置)",
+                "context_compression_threshold_l3_tooltip": "强制生成 XML 状态摘要并重置会话。这是最省 token 的手段。建议值: 0.7 (70%)"
             }
         },
         "cloudflared": {

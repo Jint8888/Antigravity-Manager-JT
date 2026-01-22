@@ -28,7 +28,7 @@ const MAX_RETRY_ATTEMPTS: usize = 3;
 
 // ===== Model Constants for Background Tasks =====
 // These can be adjusted for performance/cost optimization
-const BACKGROUND_MODEL_LITE: &str = "gemini-2.5-flash-lite";  // For simple/lightweight tasks
+const BACKGROUND_MODEL_LITE: &str = "gemini-2.5-flash";  // For simple/lightweight tasks
 const BACKGROUND_MODEL_STANDARD: &str = "gemini-2.5-flash";   // For complex background tasks
 
 // ===== Layer 3: XML Summary Prompt Template =====
@@ -376,8 +376,12 @@ pub async fn handle_messages(
     // Google Flow 继续使用 request 对象
     // (后续代码不需要再次 filter_invalid_thinking_blocks)
     
-    // [NEW] 获取上下文缩放配置
-    let scaling_enabled = state.experimental.read().await.enable_usage_scaling;
+    // [NEW] 获取上下文控制配置
+    let experimental = state.experimental.read().await;
+    let scaling_enabled = experimental.enable_usage_scaling;
+    let threshold_l1 = experimental.context_compression_threshold_l1;
+    let threshold_l2 = experimental.context_compression_threshold_l2;
+    let threshold_l3 = experimental.context_compression_threshold_l3;
 
     // 获取最新一条“有意义”的消息内容（用于日志记录和后台任务检测）
     // 策略：反向遍历，首先筛选出所有角色为 "user" 的消息，然后从中找到第一条非 "Warmup" 且非空的文本消息
@@ -608,14 +612,14 @@ pub async fn handle_messages(
                 trace_id, usage_ratio * 100.0, raw_estimated, estimated_usage, context_limit, calibrator.get_factor()
             );
 
-            // ===== Layer 1: Tool Message Trimming (60% pressure) =====
+            // ===== Layer 1: Tool Message Trimming (L1 threshold) =====
             // Borrowed from Practical-Guide-to-Context-Engineering
             // Advantage: Completely cache-friendly (only removes messages, doesn't modify content)
-            if usage_ratio > 0.6 && !compression_applied {
+            if usage_ratio > threshold_l1 && !compression_applied {
                 if ContextManager::trim_tool_messages(&mut request_with_mapped.messages, 5) {
                     info!(
-                        "[{}] [Layer-1] Tool trimming triggered (usage: {:.1}%)",
-                        trace_id, usage_ratio * 100.0
+                        "[{}] [Layer-1] Tool trimming triggered (usage: {:.1}%, threshold: {:.1}%)",
+                        trace_id, usage_ratio * 100.0, threshold_l1 * 100.0
                     );
                     compression_applied = true;
                     
@@ -643,13 +647,13 @@ pub async fn handle_messages(
                 }
             }
 
-            // ===== Layer 2: Thinking Content Compression (75% pressure) =====
+            // ===== Layer 2: Thinking Content Compression (L2 threshold) =====
             // NEW: Preserve signatures while compressing thinking text
             // This prevents signature chain breakage (Issue #902)
-            if usage_ratio > 0.75 && !compression_applied {
+            if usage_ratio > threshold_l2 && !compression_applied {
                 info!(
-                    "[{}] [Layer-2] Thinking compression triggered (usage: {:.1}%)",
-                    trace_id, usage_ratio * 100.0
+                    "[{}] [Layer-2] Thinking compression triggered (usage: {:.1}%, threshold: {:.1}%)",
+                    trace_id, usage_ratio * 100.0, threshold_l2 * 100.0
                 );
                 
                 // Use new signature-preserving compression
@@ -674,13 +678,13 @@ pub async fn handle_messages(
                 }
             }
 
-            // ===== Layer 3: Fork Conversation + XML Summary (90% pressure) =====
+            // ===== Layer 3: Fork Conversation + XML Summary (L3 threshold) =====
             // Ultimate optimization: Generate structured summary and start fresh conversation
             // Advantage: Completely cache-friendly (append-only), extreme compression ratio
-            if usage_ratio > 0.9 && !compression_applied {
+            if usage_ratio > threshold_l3 && !compression_applied {
                 info!(
-                    "[{}] [Layer-3] Critical context pressure ({:.1}%), attempting Fork+Summary",
-                    trace_id, usage_ratio * 100.0
+                    "[{}] [Layer-3] Context pressure ({:.1}%) exceeded threshold ({:.1}%), attempting Fork+Summary",
+                    trace_id, usage_ratio * 100.0, threshold_l3 * 100.0
                 );
                 
                 // Clone token_manager Arc to avoid borrow issues

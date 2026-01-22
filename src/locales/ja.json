@@ -561,7 +561,13 @@
                 "title": "実験設定 (Experimental)",
                 "title_tooltip": "探索的な機能であり、将来のバージョンで調整または削除される可能性があります。",
                 "enable_usage_scaling": "使用量スケーリングを有効にする",
-                "enable_usage_scaling_tooltip": "Claude互換プロトコル向け。総入力が30kトークンを超えると、アグレッシブなスケーリングを有効にし、大きなコンテキストでの頻繁なクライアント側圧縮を防ぎます。注意：有効にすると、クライアントに表示される使用量は実際の課金ポイントを反映しなくなります。"
+                "enable_usage_scaling_tooltip": "Claudeプロトコル向け。入力が30kトークンを超えた際に積極的なスケーリングを行い、頻繁なクライアント側圧縮を防止します。注意：有効化後はクライアントに表示される使用量が実際の課金とは異なります。",
+                "context_compression_threshold_l1": "L1 圧縮しきい値 (ツール履歴のクリーンアップ)",
+                "context_compression_threshold_l1_tooltip": "古いツール実行記録を削除してスペースを節約します。推奨値: 0.4 (40%)",
+                "context_compression_threshold_l2": "L2 圧縮しきい値 (思考プロセスの圧縮)",
+                "context_compression_threshold_l2_tooltip": "署名を保持したまま、初期の思考ブロックを圧縮します。推奨値: 0.55 (55%)",
+                "context_compression_threshold_l3": "L3 圧縮しきい値 (要約によるリセット)",
+                "context_compression_threshold_l3_tooltip": "XML状態要約を生成してセッションをリセットします。最もトークン効率が良い手段です。推奨値: 0.7 (70%)"
             }
         },
         "cloudflared": {

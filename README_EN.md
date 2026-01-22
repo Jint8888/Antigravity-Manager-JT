@@ -220,6 +220,10 @@ print(response.choices[0].message.content)
             -   **Stability Boost**: Optimized the conversion chains for OpenAI and Claude protocols, unified image configuration parsing, and hardened the context manager's robustness.
         -   **[Core Fix] State Sync Strategy Update**:
             -   **Consistency**: Improved the immediate application logic for themes and resolved conflicts between `App.tsx` and `Settings.tsx`, ensuring UI consistency during configuration loading.
+        -   **[Core Optimization] Context Compression & Token Savings**:
+            -   **Early Compression**: Since Claude CLI sends large chunks of history when resuming, compression thresholds are now configurable with lower defaults.
+            -   **L3 Pivot**: The L3 summary reset threshold has been lowered from 90% to 70%, triggering compression earlier to prevent massive token usage.
+            -   **UI Enhancement**: Added L1/L2/L3 compression threshold sliders in Experimental Settings for dynamic user customization.
         -   **[Enhancement] API Monitor Dashboard Upgrade (PR #951)**:
             -   **Account Filtering**: Added the ability to filter traffic logs by account, allowing for precise tracking of specific account usage in high-volume environments.
             -   **Deep Detail Enhancement**: The monitor details page now displays critical metadata including request protocol (OpenAI/Anthropic/Gemini), account used, and mapped physical models.
@@ -244,6 +248,10 @@ print(response.choices[0].message.content)
         -   **[Optimization] OAuth Communication Quality (Issue #948, #887)**:
             -   **Timeout Extension**: Increased auth request timeouts to 60 seconds to significantly improve token exchange success rates in proxy environments.
             -   **Error Guidance**: Provided clear guidance for Google API connectivity issues, helping users troubleshoot proxy settings.
+            -   **[Core Fix] Removed Flash Lite Model to Fix 429 Errors**:
+                -   **Issue**: Observed that `gemini-2.5-flash-lite` is frequently returning 429 errors today due to **Upstream Google Container Capacity Exhausted** (MODEL_CAPACITY_EXHAUSTED), rather than standard account quota limits.
+                -   **Urgent Fix**: Replaced all internal `gemini-2.5-flash-lite` calls (e.g., background title generation, L3 summary compression) and preset mappings with the more stable `gemini-2.5-flash`.
+                -   **User Notice**: If you explicitly used `gemini-2.5-flash-lite` in "Custom Mappings" or "Presets", please update it to another model immediately, or you may continue to experience 429 errors.
     *   **v3.3.48 (2026-01-21)**:
         -   **[Core Fix] Windows Console Flashing Fix (Fix PR #933)**:
             -   **Problem**: On Windows, launching the application or executing background CLI commands would sometimes cause a command prompt window to briefly flash, disrupting the user experience.
@@ -409,23 +417,7 @@ print(response.choices[0].message.content)
             -   **Issue**: Complex nested array schemas in tool definitions (like `apply_patch` or `local_shell_call`) were not being recursively cleaned, leading to 400 errors from Gemini API due to unsupported fields like `const` or `propertyNames`.
             -   **Fix**: Implemented full recursive cleaning for all `Value::Array` types in the JSON Schema processor.
             -   **Impact**: Significantly improves compatibility with tools that use complex array schemas.
-    *   **v3.3.47 (2026-01-21)**:
-        -   **[Feature] Cloudflared Tunnel Support (PR #923)**:
-            -   **Core Function**: Integrated `cloudflared` tunnel support, allowing users without public IPs or in complex network environments to publish API services via Cloudflare tunnels.
-            -   **UX Optimization**: Added a dedicated Cloudflared configuration UI for status monitoring, log viewing, and one-click tunnel control.
-            -   **i18n Completion**: Added translations for Cloudflared features in 8 languages (English, Chinese, Japanese, Korean, Vietnamese, Turkish, Russian, etc.).
-        -   **[Core Fix] Resolve Startup Failure Due to Git Merge Conflict**:
-            -   **Fix**: Removed `<<<<<<< HEAD` conflict markers in `src-tauri/src/proxy/handlers/claude.rs` caused by parallel PR merges.
-            -   **Impact**: Restored backend compilation and resolved the "crash on startup" issue.
-        -   **[Core Optimization] 3-Layer Progressive Context Compression (3-Layer Progressive Context PCC)**:
-            -   **Background**: Gemini API does not support JSON Schema fields like `propertyNames` and `const`. Although whitelist filtering logic was in place, the `clean_json_schema_recursive` function lacked recursive handling for `Value::Array` types, causing illegal fields nested within `anyOf`, `oneOf`, or `items` arrays to escape cleaning, triggering `Invalid JSON payload received. Unknown name "propertyNames"/"const"` errors.
-            -   **Fix Details**:
-                - **Added Recursive Cleaning Before anyOf/oneOf Merging**: Recursively cleans each branch's content before merging `anyOf`/`oneOf` branches, ensuring merged branches are already cleaned and preventing illegal fields from escaping during the merge process.
-                - **Added Generic Array Recursive Processing Branch**: Added a `Value::Array` branch to the `match` statement, ensuring all array-type values (including `items`, `enum`, etc.) are recursively cleaned, covering all array fields that may contain Schema definitions.
-            -   **Test Verification**: Added 3 test cases to verify the fix. All 14 tests passed with no regressions.
-            -   **Impact**: Resolved 400 errors caused by nested array structures in complex tool definitions (such as MCP tools), ensuring 100% Gemini API compatibility.
-        -   **[System Consistency] Unified requestId Prefixes**:
-            -   **Fix Details**: Unified the `requestId` prefix for OpenAI paths from `openai-` to `agent-`, ensuring high consistency with Claude protocol characteristics and improving upstream compatibility.
+
     *   **v3.3.45 (2026-01-19)**:
         - **[Core] Critical Fix for Claude/Gemini SSE Interruptions & 0-Token Responses (Issue #859)**:
             - **Enhanced Peek Logic**: The proxy now loops through initial SSE chunks to filter out heartbeat pings and empty data, ensuring a valid content block is received before committing to a 200 OK response.

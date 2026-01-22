@@ -135,23 +135,42 @@ async fn ensure_oauth_flow_prepared(app_handle: &tauri::AppHandle) -> Result<Str
                 // Reuse the existing parsing/response code by constructing a temporary listener task
                 // that sends into the shared oneshot.
                 let mut buffer = [0u8; 4096];
-                let _ = stream.read(&mut buffer).await;
-                let request = String::from_utf8_lossy(&buffer);
+                let bytes_read = stream.read(&mut buffer).await.unwrap_or(0);
+                let request = String::from_utf8_lossy(&buffer[..bytes_read]);
+                
+                // [FIX #931/850/778] More robust parsing and detailed logging
                 let code = request
                     .lines()
                     .next()
-                    .and_then(|line| line.split_whitespace().nth(1))
-                    .and_then(|path| Url::parse(&format!("http://127.0.0.1:{}{}", port, path)).ok())
+                    .and_then(|line| {
+                        let parts: Vec<&str> = line.split_whitespace().collect();
+                        if parts.len() >= 2 { Some(parts[1]) } else { None }
+                    })
+                    .and_then(|path| {
+                        // Use a dummy base for parsing; redirect_uri is already set to localhost
+                        Url::parse(&format!("http://localhost{}", path)).ok()
+                    })
                     .and_then(|url| {
                         url.query_pairs()
                             .find(|(k, _)| k == "code")
                             .map(|(_, v)| v.into_owned())
                     });
 
+                if code.is_none() && bytes_read > 0 {
+                    crate::modules::logger::log_error(&format!(
+                        "OAuth callback failed to parse code. Raw request (first 512 bytes): {}",
+                        &request.chars().take(512).collect::<String>()
+                    ));
+                }
+
                 let (result, response_html) = match code {
-                    Some(code) => (Ok(code), oauth_success_html()),
+                    Some(code) => {
+                        crate::modules::logger::log_info("Successfully captured OAuth code from IPv4 listener");
+                        (Ok(code), oauth_success_html())
+                    },
                     None => (Err("Failed to get Authorization Code in callback".to_string()), oauth_fail_html()),
                 };
+                
                 let _ = stream.write_all(response_html.as_bytes()).await;
                 let _ = stream.flush().await;
 
@@ -173,23 +192,40 @@ async fn ensure_oauth_flow_prepared(app_handle: &tauri::AppHandle) -> Result<Str
                 _ = rx.changed() => Err("OAuth cancelled".to_string()),
             } {
                 let mut buffer = [0u8; 4096];
-                let _ = stream.read(&mut buffer).await;
-                let request = String::from_utf8_lossy(&buffer);
+                let bytes_read = stream.read(&mut buffer).await.unwrap_or(0);
+                let request = String::from_utf8_lossy(&buffer[..bytes_read]);
+                
                 let code = request
                     .lines()
                     .next()
-                    .and_then(|line| line.split_whitespace().nth(1))
-                    .and_then(|path| Url::parse(&format!("http://127.0.0.1:{}{}", port, path)).ok())
+                    .and_then(|line| {
+                        let parts: Vec<&str> = line.split_whitespace().collect();
+                        if parts.len() >= 2 { Some(parts[1]) } else { None }
+                    })
+                    .and_then(|path| {
+                        Url::parse(&format!("http://localhost{}", path)).ok()
+                    })
                     .and_then(|url| {
                         url.query_pairs()
                             .find(|(k, _)| k == "code")
                             .map(|(_, v)| v.into_owned())
                     });
 
+                if code.is_none() && bytes_read > 0 {
+                    crate::modules::logger::log_error(&format!(
+                        "OAuth callback failed to parse code (IPv6). Raw request: {}",
+                        &request.chars().take(512).collect::<String>()
+                    ));
+                }
+
                 let (result, response_html) = match code {
-                    Some(code) => (Ok(code), oauth_success_html()),
+                    Some(code) => {
+                        crate::modules::logger::log_info("Successfully captured OAuth code from IPv6 listener");
+                        (Ok(code), oauth_success_html())
+                    },
                     None => (Err("Failed to get Authorization Code in callback".to_string()), oauth_fail_html()),
                 };
+                
                 let _ = stream.write_all(response_html.as_bytes()).await;
                 let _ = stream.flush().await;
 

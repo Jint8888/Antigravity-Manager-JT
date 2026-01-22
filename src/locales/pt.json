@@ -538,7 +538,13 @@
                 "title": "Configurações Experimentais",
                 "title_tooltip": "Recursos exploratórios que podem ser ajustados ou removidos em versões futuras.",
                 "enable_usage_scaling": "Ativar Escalonamento de Uso",
-                "enable_usage_scaling_tooltip": "Para protocolo Claude. Ativa escalonamento agressivo quando a entrada total excede 30k tokens para evitar compressão frequente no lado do cliente em grandes contextos. Nota: O uso relatado não refletirá o faturamento real após ativar."
+                "enable_usage_scaling_tooltip": "Para protocolo Claude. Ativa escalonamento agressivo quando a entrada total excede 30k tokens para evitar compressão frequente no lado do cliente em grandes contextos. Nota: O uso relatado não refletirá o faturamento real após ativar.",
+                "context_compression_threshold_l1": "Limiar de Compressão L1 (Aparagem de Ferramentas)",
+                "context_compression_threshold_l1_tooltip": "Apara registros antigos de chamadas de ferramentas para economizar espaço. Recomendado: 0.4 (40%)",
+                "context_compression_threshold_l2": "Limiar de Compressão L2 (Compressão de Pensamento)",
+                "context_compression_threshold_l2_tooltip": "Comprime blocos de pensamento iniciais mantendo as assinaturas. Recomendado: 0.55 (55%)",
+                "context_compression_threshold_l3": "Limiar de Compressão L3 (Pivô de Resumo)",
+                "context_compression_threshold_l3_tooltip": "Gera um resumo de estado XML e pivota para uma nova sessão. Recomendado: 0.7 (70%)"
             },
             "cloudflared": {
                 "title": "Acesso Público (Cloudflared)",

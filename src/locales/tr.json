@@ -513,7 +513,13 @@
                 "title": "Deneysel Ayarlar",
                 "title_tooltip": "Gelecek sürümlerde ayarlanabilecek veya kaldırılabilecek keşifsel özellikler.",
                 "enable_usage_scaling": "Kullanım Ölçeklendirmeyi Etkinleştir",
-                "enable_usage_scaling_tooltip": "Claude protokolü için. Toplam giriş 30 bin jetonu aştığında, büyük bağlamlarda sık istemci tarafı sıkıştırmayı önlemek için agresif ölçeklendirmeyi etkinleştirir. Not: Etkinleştirildikten sonra bildirilen kullanım gerçek faturalandırmayı yansıtmayacaktır."
+                "enable_usage_scaling_tooltip": "Claude protokolü için. Toplam giriş 30 bin jetonu aştığında, büyük bağlamlarda sık istemci tarafı sıkıştırmayı önlemek için agresif ölçeklendirmeyi etkinleştirir. Not: Etkinleştirildikten sonra bildirilen kullanım gerçek faturalandırmayı yansıtmayacaktır.",
+                "context_compression_threshold_l1": "L1 Sıkıştırma Eşiği (Araç Kırpma)",
+                "context_compression_threshold_l1_tooltip": "Yer kazanmak için eski araç çağrı kayıtlarını kırpar. Önerilen: 0.4 (40%)",
+                "context_compression_threshold_l2": "L2 Sıkıştırma Eşiği (Düşünce Sıkıştırma)",
+                "context_compression_threshold_l2_tooltip": "İmzaları korurken erken düşünce bloklarını sıkıştırır. Önerilen: 0.55 (55%)",
+                "context_compression_threshold_l3": "L3 Sıkıştırma Eşiği (Özet Pivotu)",
+                "context_compression_threshold_l3_tooltip": "XML durum özeti oluşturur ve taze bir oturuma geçer. Önerilen: 0.7 (70%)"
             },
             "cloudflared": {
                 "title": "Genel Erişim (Cloudflared)",

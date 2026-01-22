@@ -74,7 +74,7 @@ pub fn get_auth_url(redirect_uri: &str) -> String {
 
 /// Exchange authorization code for token
 pub async fn exchange_code(code: &str, redirect_uri: &str) -> Result<TokenResponse, String> {
-    let client = crate::utils::http::get_client();
+    let client = crate::utils::http::get_long_client(); // [FIX #948/887] Extend timeout to 60s for OAuth
     
     let params = [
         ("client_id", CLIENT_ID),
@@ -89,7 +89,13 @@ pub async fn exchange_code(code: &str, redirect_uri: &str) -> Result<TokenRespon
         .form(&params)
         .send()
         .await
-        .map_err(|e| format!("Token exchange request failed: {}", e))?;
+        .map_err(|e| {
+            if e.is_connect() || e.is_timeout() {
+                format!("Token exchange request failed: {}. 请检查你的网络代理设置，确保可以稳定连接 Google 服务。", e)
+            } else {
+                format!("Token exchange request failed: {}", e)
+            }
+        })?;
 
     if response.status().is_success() {
         let token_res = response.json::<TokenResponse>()
@@ -122,7 +128,7 @@ pub async fn exchange_code(code: &str, redirect_uri: &str) -> Result<TokenRespon
 
 /// Refresh access_token using refresh_token
 pub async fn refresh_access_token(refresh_token: &str) -> Result<TokenResponse, String> {
-    let client = crate::utils::http::get_client();
+    let client = crate::utils::http::get_long_client(); // [FIX #948/887] Extend timeout to 60s
     
     let params = [
         ("client_id", CLIENT_ID),
@@ -138,7 +144,13 @@ pub async fn refresh_access_token(refresh_token: &str) -> Result<TokenResponse, 
         .form(&params)
         .send()
         .await
-        .map_err(|e| format!("Refresh request failed: {}", e))?;
+        .map_err(|e| {
+            if e.is_connect() || e.is_timeout() {
+                format!("Refresh request failed: {}. 无法连接 Google 授权服务器，请检查代理设置。", e)
+            } else {
+                format!("Refresh request failed: {}", e)
+            }
+        })?;
 
     if response.status().is_success() {
         let token_data = response

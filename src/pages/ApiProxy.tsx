@@ -30,6 +30,7 @@ import { cn } from '../utils/cn';
 import { useProxyModels } from '../hooks/useProxyModels';
 import GroupedSelect, { SelectOption } from '../components/common/GroupedSelect';
 import { CliSyncCard } from '../components/proxy/CliSyncCard';
+import DebouncedSlider from '../components/common/DebouncedSlider';
 
 interface ProxyStatus {
     running: boolean;
@@ -366,10 +367,12 @@ export default function ApiProxy() {
         }
     };
 
+
     const saveConfig = async (newConfig: AppConfig) => {
+        // 1. 立即更新 UI 状态，确保流畅
+        setAppConfig(newConfig);
         try {
             await invoke('save_config', { config: newConfig });
-            setAppConfig(newConfig);
         } catch (error) {
             console.error('保存配置失败:', error);
             showToast(`${t('common.error')}: ${error}`, 'error');
@@ -438,8 +441,8 @@ export default function ApiProxy() {
             "claude-3-5-sonnet-*": "claude-sonnet-4-5",
             "claude-3-opus-*": "claude-opus-4-5-thinking",
             "claude-opus-4-*": "claude-opus-4-5-thinking",
-            "claude-haiku-*": "gemini-2.5-flash-lite",
-            "claude-3-haiku-*": "gemini-2.5-flash-lite",
+            "claude-haiku-*": "gemini-2.5-flash",
+            "claude-3-haiku-*": "gemini-2.5-flash",
         };
 
         const newConfig = {
@@ -504,7 +507,12 @@ export default function ApiProxy() {
             proxy: {
                 ...appConfig.proxy,
                 experimental: {
-                    ...(appConfig.proxy.experimental || { enable_usage_scaling: true }),
+                    ...(appConfig.proxy.experimental || {
+                        enable_usage_scaling: true,
+                        context_compression_threshold_l1: 0.4,
+                        context_compression_threshold_l2: 0.55,
+                        context_compression_threshold_l3: 0.7
+                    }),
                     ...updates
                 }
             }
@@ -1523,13 +1531,73 @@ print(response.text)`;
                                             <div className="w-11 h-6 bg-gray-200 dark:bg-base-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-500 shadow-inner"></div>
                                         </label>
                                     </div>
+
+                                    {/* L1 Threshold */}
+                                    <div className="flex flex-col gap-2 p-4 bg-gray-50 dark:bg-base-200 rounded-xl border border-gray-100 dark:border-base-300">
+                                        <div className="flex items-center justify-between w-full">
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-sm font-bold text-gray-900 dark:text-base-content">
+                                                    {t('proxy.config.experimental.context_compression_threshold_l1')}
+                                                </span>
+                                                <HelpTooltip text={t('proxy.config.experimental.context_compression_threshold_l1_tooltip')} />
+                                            </div>
+                                        </div>
+                                        <DebouncedSlider
+                                            min={0.1}
+                                            max={1}
+                                            step={0.05}
+                                            className="range range-purple range-xs"
+                                            value={appConfig.proxy.experimental?.context_compression_threshold_l1 || 0.4}
+                                            onChange={(val) => updateExperimentalConfig({ context_compression_threshold_l1: val })}
+                                        />
+                                    </div>
+
+                                    {/* L2 Threshold */}
+                                    <div className="flex flex-col gap-2 p-4 bg-gray-50 dark:bg-base-200 rounded-xl border border-gray-100 dark:border-base-300">
+                                        <div className="flex items-center justify-between w-full">
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-sm font-bold text-gray-900 dark:text-base-content">
+                                                    {t('proxy.config.experimental.context_compression_threshold_l2')}
+                                                </span>
+                                                <HelpTooltip text={t('proxy.config.experimental.context_compression_threshold_l2_tooltip')} />
+                                            </div>
+                                        </div>
+                                        <DebouncedSlider
+                                            min={0.1}
+                                            max={1}
+                                            step={0.05}
+                                            className="range range-purple range-xs"
+                                            value={appConfig.proxy.experimental?.context_compression_threshold_l2 || 0.55}
+                                            onChange={(val) => updateExperimentalConfig({ context_compression_threshold_l2: val })}
+                                        />
+                                    </div>
+
+                                    {/* L3 Threshold */}
+                                    <div className="flex flex-col gap-2 p-4 bg-gray-50 dark:bg-base-200 rounded-xl border border-gray-100 dark:border-base-300">
+                                        <div className="flex items-center justify-between w-full">
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-sm font-bold text-gray-900 dark:text-base-content">
+                                                    {t('proxy.config.experimental.context_compression_threshold_l3')}
+                                                </span>
+                                                <HelpTooltip text={t('proxy.config.experimental.context_compression_threshold_l3_tooltip')} />
+                                            </div>
+                                        </div>
+                                        <DebouncedSlider
+                                            min={0.1}
+                                            max={1}
+                                            step={0.05}
+                                            className="range range-purple range-xs"
+                                            value={appConfig.proxy.experimental?.context_compression_threshold_l3 || 0.7}
+                                            onChange={(val) => updateExperimentalConfig({ context_compression_threshold_l3: val })}
+                                        />
+                                    </div>
                                 </div>
                             </CollapsibleCard>
 
                             {/* 公网访问 (Cloudflared) */}
                             <CollapsibleCard
                                 title={t('proxy.cloudflared.title', { defaultValue: 'Public Access (Cloudflared)' })}
-                                icon={<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-orange-500"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>}
+                                icon={<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-orange-500"><path d="M12 2L2 7l10 5 10-5-10-5z" /><path d="M2 17l10 5 10-5" /><path d="M2 12l10 5 10-5" /></svg>}
                                 enabled={cfStatus.running}
                                 onToggle={handleCfToggle}
                                 allowInteractionWhenDisabled={true}
